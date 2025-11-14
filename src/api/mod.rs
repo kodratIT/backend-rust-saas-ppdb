@@ -2,6 +2,7 @@ use axum::Router;
 
 pub mod auth;
 pub mod middleware;
+pub mod periods;
 pub mod schools;
 pub mod users;
 
@@ -12,5 +13,6 @@ pub fn routes(state: AppState) -> Router {
         .nest("/auth", auth::routes(state.clone()))
         .nest("/schools", schools::routes(state.clone()))
         .nest("/users", users::routes(state.clone()))
+        .nest("/periods", periods::routes(state.clone()))
         .with_state(state)
 }
