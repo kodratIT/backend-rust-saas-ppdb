@@ -5,7 +5,7 @@ use crate::models::registration::{Document, Registration};
 use crate::utils::error::AppResult;
 
 pub struct RegistrationRepository {
-    pool: PgPool,
+    pub pool: PgPool,
 }
 
 impl RegistrationRepository {

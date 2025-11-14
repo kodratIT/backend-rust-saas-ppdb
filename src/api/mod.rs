@@ -5,6 +5,7 @@ pub mod middleware;
 pub mod periods;
 pub mod registrations;
 pub mod schools;
+pub mod selection;
 pub mod users;
 pub mod verifications;
 
@@ -18,5 +19,6 @@ pub fn routes(state: AppState) -> Router {
         .nest("/periods", periods::routes(state.clone()))
         .nest("/registrations", registrations::routes(state.clone()))
         .nest("/verifications", verifications::routes(state.clone()))
+        .nest("/selection", selection::routes(state.clone()))
         .with_state(state)
 }
