@@ -1,5 +1,6 @@
 use axum::Router;
 
+pub mod announcements;
 pub mod auth;
 pub mod middleware;
 pub mod periods;
@@ -20,5 +21,6 @@ pub fn routes(state: AppState) -> Router {
         .nest("/registrations", registrations::routes(state.clone()))
         .nest("/verifications", verifications::routes(state.clone()))
         .nest("/selection", selection::routes(state.clone()))
+        .nest("/announcements", announcements::routes(state.clone()))
         .with_state(state)
 }

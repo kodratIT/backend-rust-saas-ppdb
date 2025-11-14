@@ -1,3 +1,4 @@
+pub mod announcement_service;
 pub mod auth_service;
 pub mod period_service;
 pub mod registration_service;
