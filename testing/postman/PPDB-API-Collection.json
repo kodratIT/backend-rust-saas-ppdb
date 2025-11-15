@@ -1,0 +1,605 @@
+{
+  "info": {
+    "name": "PPDB Sekolah API",
+    "description": "Complete API collection for PPDB system testing",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refresh_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "school_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "period_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "path_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "registration_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Authentication",
+      "item": [
+        {
+          "name": "Register Parent",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.environment.set('user_id', response.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"parent1@example.com\",\n  \"password\": \"admin123\",\n  \"full_name\": \"Budi Santoso\",\n  \"phone\": \"081111111111\",\n  \"nik\": \"3201010101010001\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Login SuperAdmin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('access_token', response.access_token);",
+                  "    pm.collectionVariables.set('refresh_token', response.refresh_token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"superadmin@ppdb.com\",\n  \"password\": \"admin123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Login Parent",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('access_token', response.access_token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"parent1@example.com\",\n  \"password\": \"admin123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/auth/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "me"]
+            }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/refresh",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "refresh"]
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "logout"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Schools",
+      "item": [
+        {
+          "name": "List Schools",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/schools",
+              "host": ["{{base_url}}"],
+              "path": ["api", "schools"]
+            }
+          }
+        },
+        {
+          "name": "Create School",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('school_id', response.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"SMA Negeri 1 Jakarta\",\n  \"npsn\": \"12345678\",\n  \"address\": \"Jl. Sudirman No. 1, Jakarta\",\n  \"phone\": \"021-1234567\",\n  \"email\": \"info@sman1jakarta.sch.id\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/schools",
+              "host": ["{{base_url}}"],
+              "path": ["api", "schools"]
+            }
+          }
+        },
+        {
+          "name": "Get School",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/schools/{{school_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "schools", "{{school_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Periods",
+      "item": [
+        {
+          "name": "List Periods",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/periods",
+              "host": ["{{base_url}}"],
+              "path": ["api", "periods"]
+            }
+          }
+        },
+        {
+          "name": "Create Period",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('period_id', response.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"PPDB 2024/2025\",\n  \"academic_year\": \"2024/2025\",\n  \"level\": \"SMA\",\n  \"start_date\": \"2024-06-01T00:00:00Z\",\n  \"end_date\": \"2024-07-31T23:59:59Z\",\n  \"registration_start\": \"2024-06-01T00:00:00Z\",\n  \"registration_end\": \"2024-06-30T23:59:59Z\",\n  \"announcement_date\": \"2024-07-15T00:00:00Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/periods",
+              "host": ["{{base_url}}"],
+              "path": ["api", "periods"]
+            }
+          }
+        },
+        {
+          "name": "Create Path - Zonasi",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('path_id', response.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jalur Zonasi\",\n  \"path_type\": \"Zonasi\",\n  \"quota\": 180,\n  \"description\": \"Jalur zonasi berdasarkan jarak tempat tinggal\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/periods/{{period_id}}/paths",
+              "host": ["{{base_url}}"],
+              "path": ["api", "periods", "{{period_id}}", "paths"]
+            }
+          }
+        },
+        {
+          "name": "Activate Period",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/periods/{{period_id}}/activate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "periods", "{{period_id}}", "activate"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Registrations",
+      "item": [
+        {
+          "name": "List Registrations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/registrations",
+              "host": ["{{base_url}}"],
+              "path": ["api", "registrations"]
+            }
+          }
+        },
+        {
+          "name": "Create Registration",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('registration_id', response.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"period_id\": {{period_id}},\n  \"path_id\": {{path_id}},\n  \"student_nisn\": \"0012345678\",\n  \"student_nik\": \"3201234567890124\",\n  \"student_name\": \"Ahmad Santoso\",\n  \"student_birth_place\": \"Jakarta\",\n  \"student_birth_date\": \"2010-05-15\",\n  \"student_gender\": \"Male\",\n  \"student_address\": \"Jl. Kebon Jeruk No. 10, Jakarta\",\n  \"previous_school\": \"SMP Negeri 5 Jakarta\",\n  \"distance_km\": 2.5,\n  \"avg_report_score\": 85.5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/registrations",
+              "host": ["{{base_url}}"],
+              "path": ["api", "registrations"]
+            }
+          }
+        },
+        {
+          "name": "Submit Registration",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/registrations/{{registration_id}}/submit",
+              "host": ["{{base_url}}"],
+              "path": ["api", "registrations", "{{registration_id}}", "submit"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Verifications",
+      "item": [
+        {
+          "name": "Get Pending Verifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/verifications/pending",
+              "host": ["{{base_url}}"],
+              "path": ["api", "verifications", "pending"]
+            }
+          }
+        },
+        {
+          "name": "Verify Registration",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"Semua dokumen lengkap dan valid\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/verifications/registrations/{{registration_id}}/verify",
+              "host": ["{{base_url}}"],
+              "path": ["api", "verifications", "registrations", "{{registration_id}}", "verify"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Selection",
+      "item": [
+        {
+          "name": "Calculate Scores",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"period_id\": {{period_id}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/selection/calculate-scores",
+              "host": ["{{base_url}}"],
+              "path": ["api", "selection", "calculate-scores"]
+            }
+          }
+        },
+        {
+          "name": "Update Rankings",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"period_id\": {{period_id}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/selection/update-rankings",
+              "host": ["{{base_url}}"],
+              "path": ["api", "selection", "update-rankings"]
+            }
+          }
+        },
+        {
+          "name": "Get Rankings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/selection/rankings?period_id={{period_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "selection", "rankings"],
+              "query": [
+                {
+                  "key": "period_id",
+                  "value": "{{period_id}}"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Announcements",
+      "item": [
+        {
+          "name": "Run Selection",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"period_id\": {{period_id}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/announcements/run-selection",
+              "host": ["{{base_url}}"],
+              "path": ["api", "announcements", "run-selection"]
+            }
+          }
+        },
+        {
+          "name": "Announce Results",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"period_id\": {{period_id}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/announcements/announce",
+              "host": ["{{base_url}}"],
+              "path": ["api", "announcements", "announce"]
+            }
+          }
+        },
+        {
+          "name": "Check Result",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/announcements/check-result?registration_number=REG001&nisn=0012345678",
+              "host": ["{{base_url}}"],
+              "path": ["api", "announcements", "check-result"],
+              "query": [
+                {
+                  "key": "registration_number",
+                  "value": "REG001"
+                },
+                {
+                  "key": "nisn",
+                  "value": "0012345678"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

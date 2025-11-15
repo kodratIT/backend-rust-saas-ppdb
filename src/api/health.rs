@@ -33,7 +33,7 @@ pub struct HealthResponse {
 /// This endpoint does not require authentication.
 #[utoipa::path(
     get,
-    path = "/api/health",
+    path = "/health",
     tag = "System",
     responses(
         (status = 200, description = "Service is healthy", body = HealthResponse),

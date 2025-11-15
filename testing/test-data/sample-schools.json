@@ -1,0 +1,42 @@
+[
+  {
+    "name": "SMA Negeri 1 Jakarta",
+    "npsn": "12345678",
+    "address": "Jl. Sudirman No. 1, Jakarta Pusat",
+    "phone": "021-1234567",
+    "email": "info@sman1jakarta.sch.id",
+    "logo_url": "https://example.com/logos/sman1jakarta.png"
+  },
+  {
+    "name": "SMA Negeri 2 Bandung",
+    "npsn": "87654321",
+    "address": "Jl. Asia Afrika No. 10, Bandung",
+    "phone": "022-7654321",
+    "email": "info@sman2bandung.sch.id",
+    "logo_url": "https://example.com/logos/sman2bandung.png"
+  },
+  {
+    "name": "SMA Negeri 3 Surabaya",
+    "npsn": "11223344",
+    "address": "Jl. Pemuda No. 5, Surabaya",
+    "phone": "031-1122334",
+    "email": "info@sman3surabaya.sch.id",
+    "logo_url": "https://example.com/logos/sman3surabaya.png"
+  },
+  {
+    "name": "SMA Negeri 1 Yogyakarta",
+    "npsn": "55667788",
+    "address": "Jl. Malioboro No. 20, Yogyakarta",
+    "phone": "0274-556677",
+    "email": "info@sman1yogya.sch.id",
+    "logo_url": "https://example.com/logos/sman1yogya.png"
+  },
+  {
+    "name": "SMA Negeri 1 Medan",
+    "npsn": "99887766",
+    "address": "Jl. Gatot Subroto No. 15, Medan",
+    "phone": "061-9988776",
+    "email": "info@sman1medan.sch.id",
+    "logo_url": "https://example.com/logos/sman1medan.png"
+  }
+]

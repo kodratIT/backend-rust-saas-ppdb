@@ -1,0 +1,170 @@
+[
+  {
+    "student_nisn": "0012345678",
+    "student_nik": "3201234567890001",
+    "student_name": "Ahmad Santoso",
+    "student_birth_place": "Jakarta",
+    "student_birth_date": "2010-05-15",
+    "student_gender": "Male",
+    "student_address": "Jl. Kebon Jeruk No. 10, Jakarta Barat",
+    "previous_school": "SMP Negeri 5 Jakarta",
+    "path_type": "Zonasi",
+    "distance_km": 2.5,
+    "avg_report_score": 85.5,
+    "expected_result": "Accepted"
+  },
+  {
+    "student_nisn": "0012345679",
+    "student_nik": "3201234567890002",
+    "student_name": "Siti Nurhaliza",
+    "student_birth_place": "Jakarta",
+    "student_birth_date": "2010-03-20",
+    "student_gender": "Female",
+    "student_address": "Jl. Mangga Dua No. 5, Jakarta Utara",
+    "previous_school": "SMP Negeri 10 Jakarta",
+    "path_type": "Prestasi",
+    "distance_km": 5.0,
+    "avg_report_score": 92.0,
+    "achievements": [
+      {
+        "name": "Juara 1 Olimpiade Matematika Tingkat Provinsi",
+        "level": "Provinsi",
+        "year": 2023
+      },
+      {
+        "name": "Juara 2 Lomba Karya Ilmiah Remaja",
+        "level": "Nasional",
+        "year": 2023
+      }
+    ],
+    "expected_result": "Accepted"
+  },
+  {
+    "student_nisn": "0012345680",
+    "student_nik": "3201234567890003",
+    "student_name": "Budi Prasetyo",
+    "student_birth_place": "Jakarta",
+    "student_birth_date": "2010-07-10",
+    "student_gender": "Male",
+    "student_address": "Jl. Cempaka Putih No. 15, Jakarta Pusat",
+    "previous_school": "SMP Negeri 15 Jakarta",
+    "path_type": "Zonasi",
+    "distance_km": 8.0,
+    "avg_report_score": 75.0,
+    "expected_result": "Rejected"
+  },
+  {
+    "student_nisn": "0012345681",
+    "student_nik": "3201234567890004",
+    "student_name": "Dewi Lestari",
+    "student_birth_place": "Jakarta",
+    "student_birth_date": "2010-09-25",
+    "student_gender": "Female",
+    "student_address": "Jl. Kramat Raya No. 20, Jakarta Pusat",
+    "previous_school": "SMP Negeri 20 Jakarta",
+    "path_type": "Afirmasi",
+    "distance_km": 3.0,
+    "avg_report_score": 80.0,
+    "has_kip": true,
+    "expected_result": "Accepted"
+  },
+  {
+    "student_nisn": "0012345682",
+    "student_nik": "3201234567890005",
+    "student_name": "Eko Wijaya",
+    "student_birth_place": "Surabaya",
+    "student_birth_date": "2010-11-05",
+    "student_gender": "Male",
+    "student_address": "Jl. Tanjung Duren No. 8, Jakarta Barat",
+    "previous_school": "SMP Negeri 1 Surabaya",
+    "path_type": "PerpindahanTugas",
+    "distance_km": 4.0,
+    "avg_report_score": 82.0,
+    "parent_transfer_letter": true,
+    "expected_result": "Accepted"
+  },
+  {
+    "student_nisn": "0012345683",
+    "student_nik": "3201234567890006",
+    "student_name": "Fitri Handayani",
+    "student_birth_place": "Jakarta",
+    "student_birth_date": "2010-02-14",
+    "student_gender": "Female",
+    "student_address": "Jl. Pramuka No. 25, Jakarta Timur",
+    "previous_school": "SMP Negeri 25 Jakarta",
+    "path_type": "Prestasi",
+    "distance_km": 6.0,
+    "avg_report_score": 88.5,
+    "achievements": [
+      {
+        "name": "Juara 3 Lomba Pidato Bahasa Inggris",
+        "level": "Kota",
+        "year": 2023
+      }
+    ],
+    "expected_result": "Accepted"
+  },
+  {
+    "student_nisn": "0012345684",
+    "student_nik": "3201234567890007",
+    "student_name": "Gilang Ramadhan",
+    "student_birth_place": "Jakarta",
+    "student_birth_date": "2010-06-30",
+    "student_gender": "Male",
+    "student_address": "Jl. Raya Condet No. 12, Jakarta Timur",
+    "previous_school": "SMP Negeri 30 Jakarta",
+    "path_type": "Zonasi",
+    "distance_km": 10.0,
+    "avg_report_score": 70.0,
+    "expected_result": "Rejected"
+  },
+  {
+    "student_nisn": "0012345685",
+    "student_nik": "3201234567890008",
+    "student_name": "Hana Permata",
+    "student_birth_place": "Jakarta",
+    "student_birth_date": "2010-04-18",
+    "student_gender": "Female",
+    "student_address": "Jl. Tebet Raya No. 30, Jakarta Selatan",
+    "previous_school": "SMP Negeri 35 Jakarta",
+    "path_type": "Zonasi",
+    "distance_km": 1.5,
+    "avg_report_score": 90.0,
+    "expected_result": "Accepted"
+  },
+  {
+    "student_nisn": "0012345686",
+    "student_nik": "3201234567890009",
+    "student_name": "Indra Gunawan",
+    "student_birth_place": "Jakarta",
+    "student_birth_date": "2010-08-22",
+    "student_gender": "Male",
+    "student_address": "Jl. Fatmawati No. 40, Jakarta Selatan",
+    "previous_school": "SMP Negeri 40 Jakarta",
+    "path_type": "Prestasi",
+    "distance_km": 7.0,
+    "avg_report_score": 86.0,
+    "achievements": [
+      {
+        "name": "Juara 1 Lomba Robotika",
+        "level": "Kota",
+        "year": 2023
+      }
+    ],
+    "expected_result": "Accepted"
+  },
+  {
+    "student_nisn": "0012345687",
+    "student_nik": "3201234567890010",
+    "student_name": "Julia Kartika",
+    "student_birth_place": "Jakarta",
+    "student_birth_date": "2010-12-08",
+    "student_gender": "Female",
+    "student_address": "Jl. Cilandak Raya No. 50, Jakarta Selatan",
+    "previous_school": "SMP Negeri 45 Jakarta",
+    "path_type": "Zonasi",
+    "distance_km": 3.5,
+    "avg_report_score": 83.0,
+    "expected_result": "Accepted"
+  }
+]

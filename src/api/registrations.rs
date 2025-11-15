@@ -5,7 +5,7 @@ use axum::{
     routing::{delete, get, post},
     Extension, Json, Router,
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -54,9 +54,9 @@ pub struct CreateRegistrationRequest {
     #[schema(example = "Jakarta")]
     student_birth_place: String,
     
-    /// Tanggal lahir siswa
-    #[schema(value_type = String, example = "2010-01-15T00:00:00Z")]
-    student_birth_date: DateTime<Utc>,
+    /// Tanggal lahir siswa (format: YYYY-MM-DD)
+    #[schema(value_type = String, example = "2010-01-15")]
+    student_birth_date: NaiveDate,
     
     /// Agama siswa
     #[schema(example = "Islam")]
@@ -126,9 +126,9 @@ pub struct UpdateRegistrationRequest {
     #[schema(example = "Jakarta")]
     student_birth_place: Option<String>,
     
-    /// Tanggal lahir siswa (opsional)
-    #[schema(value_type = Option<String>, example = "2010-01-15T00:00:00Z")]
-    student_birth_date: Option<DateTime<Utc>>,
+    /// Tanggal lahir siswa (opsional, format: YYYY-MM-DD)
+    #[schema(value_type = Option<String>, example = "2010-01-15")]
+    student_birth_date: Option<NaiveDate>,
     
     /// Agama siswa (opsional)
     #[schema(example = "Islam")]

@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 
 use crate::models::registration::{Document, Registration};
 use crate::repositories::period_repo::PeriodRepository;
@@ -28,7 +28,7 @@ impl RegistrationService {
         student_name: String,
         student_gender: String,
         student_birth_place: String,
-        student_birth_date: DateTime<Utc>,
+        student_birth_date: NaiveDate,
         student_religion: String,
         student_address: String,
         student_phone: Option<String>,
@@ -83,6 +83,11 @@ impl RegistrationService {
             ));
         }
 
+        // Convert NaiveDate to DateTime<Utc>
+        let student_birth_datetime = student_birth_date
+            .and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap())
+            .and_utc();
+
         // Create registration
         let registration = self
             .registration_repo
@@ -95,7 +100,7 @@ impl RegistrationService {
                 &student_name,
                 &student_gender,
                 &student_birth_place,
-                student_birth_date,
+                student_birth_datetime,
                 &student_religion,
                 &student_address,
                 student_phone.as_deref(),
@@ -168,7 +173,7 @@ impl RegistrationService {
         student_name: Option<String>,
         student_gender: Option<String>,
         student_birth_place: Option<String>,
-        student_birth_date: Option<DateTime<Utc>>,
+        student_birth_date: Option<NaiveDate>,
         student_religion: Option<String>,
         student_address: Option<String>,
         student_phone: Option<String>,
@@ -190,6 +195,12 @@ impl RegistrationService {
             ));
         }
 
+        // Convert NaiveDate to DateTime<Utc> if provided
+        let student_birth_datetime = student_birth_date.map(|date| {
+            date.and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap())
+                .and_utc()
+        });
+
         // Update registration
         let updated_registration = self
             .registration_repo
@@ -198,7 +209,7 @@ impl RegistrationService {
                 student_name.as_deref(),
                 student_gender.as_deref(),
                 student_birth_place.as_deref(),
-                student_birth_date,
+                student_birth_datetime,
                 student_religion.as_deref(),
                 student_address.as_deref(),
                 student_phone.as_deref(),

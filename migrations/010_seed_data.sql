@@ -7,20 +7,20 @@ INSERT INTO schools (name, npsn, code, address, phone, email, status) VALUES
 ('SD Negeri 10 Surabaya', '20300010', 'SDN10SBY', 'Jl. Pahlawan No. 10, Surabaya', '031-9876543', 'info@sdn10sby.sch.id', 'active');
 
 -- Insert super admin (password: admin123)
--- Hash generated with argon2: $argon2id$v=19$m=19456,t=2,p=1$...
+-- Hash generated with argon2 using generate_hash binary
 INSERT INTO users (school_id, email, password_hash, full_name, role, email_verified) VALUES
-(NULL, 'superadmin@ppdb.com', '$argon2id$v=19$m=19456,t=2,p=1$c29tZXNhbHQ$qLml8cg7JQbGpQqP3vqZ0Q', 'Super Admin', 'super_admin', true);
+(NULL, 'superadmin@ppdb.com', '$argon2id$v=19$m=19456,t=2,p=1$e9VbN5rXC+1/M77vebkD6Q$oPxRBCMjherBjEqv+0aVwgabo/boAu8/Rk8u6jsuXOg', 'Super Admin', 'super_admin', true);
 
--- Insert school admins for each school
+-- Insert school admins for each school (password: admin123)
 INSERT INTO users (school_id, email, password_hash, full_name, phone, role, email_verified) VALUES
-(1, 'admin@sman1jkt.sch.id', '$argon2id$v=19$m=19456,t=2,p=1$c29tZXNhbHQ$qLml8cg7JQbGpQqP3vqZ0Q', 'Admin SMA 1 Jakarta', '081234567890', 'school_admin', true),
-(2, 'admin@smpn5bdg.sch.id', '$argon2id$v=19$m=19456,t=2,p=1$c29tZXNhbHQ$qLml8cg7JQbGpQqP3vqZ0Q', 'Admin SMP 5 Bandung', '082345678901', 'school_admin', true),
-(3, 'admin@sdn10sby.sch.id', '$argon2id$v=19$m=19456,t=2,p=1$c29tZXNhbHQ$qLml8cg7JQbGpQqP3vqZ0Q', 'Admin SD 10 Surabaya', '083456789012', 'school_admin', true);
+(1, 'admin@sman1jkt.sch.id', '$argon2id$v=19$m=19456,t=2,p=1$e9VbN5rXC+1/M77vebkD6Q$oPxRBCMjherBjEqv+0aVwgabo/boAu8/Rk8u6jsuXOg', 'Admin SMA 1 Jakarta', '081234567890', 'school_admin', true),
+(2, 'admin@smpn5bdg.sch.id', '$argon2id$v=19$m=19456,t=2,p=1$e9VbN5rXC+1/M77vebkD6Q$oPxRBCMjherBjEqv+0aVwgabo/boAu8/Rk8u6jsuXOg', 'Admin SMP 5 Bandung', '082345678901', 'school_admin', true),
+(3, 'admin@sdn10sby.sch.id', '$argon2id$v=19$m=19456,t=2,p=1$e9VbN5rXC+1/M77vebkD6Q$oPxRBCMjherBjEqv+0aVwgabo/boAu8/Rk8u6jsuXOg', 'Admin SD 10 Surabaya', '083456789012', 'school_admin', true);
 
--- Insert sample parent users
+-- Insert sample parent users (password: admin123)
 INSERT INTO users (school_id, email, password_hash, full_name, phone, nik, role, email_verified) VALUES
-(1, 'parent1@example.com', '$argon2id$v=19$m=19456,t=2,p=1$c29tZXNhbHQ$qLml8cg7JQbGpQqP3vqZ0Q', 'Budi Santoso', '081111111111', '3201010101010001', 'parent', true),
-(2, 'parent2@example.com', '$argon2id$v=19$m=19456,t=2,p=1$c29tZXNhbHQ$qLml8cg7JQbGpQqP3vqZ0Q', 'Siti Rahayu', '082222222222', '3202020202020002', 'parent', true);
+(1, 'parent1@example.com', '$argon2id$v=19$m=19456,t=2,p=1$e9VbN5rXC+1/M77vebkD6Q$oPxRBCMjherBjEqv+0aVwgabo/boAu8/Rk8u6jsuXOg', 'Budi Santoso', '081111111111', '3201010101010001', 'parent', true),
+(2, 'parent2@example.com', '$argon2id$v=19$m=19456,t=2,p=1$e9VbN5rXC+1/M77vebkD6Q$oPxRBCMjherBjEqv+0aVwgabo/boAu8/Rk8u6jsuXOg', 'Siti Rahayu', '082222222222', '3202020202020002', 'parent', true);
 
 -- Insert sample periods
 INSERT INTO periods (school_id, academic_year, level, start_date, end_date, registration_start, registration_end, announcement_date, reenrollment_deadline, status) VALUES
