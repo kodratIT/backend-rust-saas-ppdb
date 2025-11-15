@@ -1,0 +1,417 @@
+mod test_helpers;
+
+use chrono::{Duration, Utc};
+use reqwest::StatusCode;
+use serde_json::json;
+use test_helpers::{parse_json, TestContext};
+
+#[tokio::test]
+async fn test_period_create_success() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+    let school_id = ctx.create_test_school(&super_admin.access_token, "TEST200").await;
+    let school_admin = ctx.create_school_admin(school_id, "admin_period@test.com").await;
+
+    let start_date = Utc::now();
+    let end_date = start_date + Duration::days(90);
+
+    let response = ctx
+        .client
+        .post(&format!("{}/periods", ctx.base_url))
+        .bearer_auth(&school_admin.access_token)
+        .json(&json!({
+            "academic_year": "2024/2025",
+            "level": "SMA",
+            "start_date": start_date.to_rfc3339(),
+            "end_date": end_date.to_rfc3339(),
+            "paths": [
+                {
+                    "path_type": "zonasi",
+                    "name": "Jalur Zonasi",
+                    "quota": 50,
+                    "description": "Jalur zonasi berdasarkan jarak rumah ke sekolah",
+                    "scoring_config": {
+                        "distance_weight": 100
+                    }
+                },
+                {
+                    "path_type": "prestasi",
+                    "name": "Jalur Prestasi",
+                    "quota": 30,
+                    "description": "Jalur prestasi akademik dan non-akademik",
+                    "scoring_config": {
+                        "academic_weight": 60,
+                        "achievement_weight": 40
+                    }
+                }
+            ]
+        }))
+        .send()
+        .await
+        .expect("Failed to create period");
+
+    assert_eq!(response.status(), StatusCode::CREATED);
+    
+    let result: serde_json::Value = parse_json(response).await;
+    assert_eq!(result["period"]["academic_year"], "2024/2025");
+    assert_eq!(result["period"]["level"], "SMA");
+    assert_eq!(result["paths"].as_array().unwrap().len(), 2);
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_period_create_invalid_academic_year() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+    let school_id = ctx.create_test_school(&super_admin.access_token, "TEST201").await;
+    let school_admin = ctx.create_school_admin(school_id, "admin_period2@test.com").await;
+
+    let start_date = Utc::now();
+    let end_date = start_date + Duration::days(90);
+
+    let response = ctx
+        .client
+        .post(&format!("{}/periods", ctx.base_url))
+        .bearer_auth(&school_admin.access_token)
+        .json(&json!({
+            "academic_year": "2024", // Invalid format
+            "level": "SMA",
+            "start_date": start_date.to_rfc3339(),
+            "end_date": end_date.to_rfc3339(),
+            "paths": []
+        }))
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_period_list() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+    let school_id = ctx.create_test_school(&super_admin.access_token, "TEST202").await;
+    let school_admin = ctx.create_school_admin(school_id, "admin_period3@test.com").await;
+
+    // Create periods
+    let start_date = Utc::now();
+    let end_date = start_date + Duration::days(90);
+
+    ctx.client
+        .post(&format!("{}/periods", ctx.base_url))
+        .bearer_auth(&school_admin.access_token)
+        .json(&json!({
+            "academic_year": "2024/2025",
+            "level": "SMA",
+            "start_date": start_date.to_rfc3339(),
+            "end_date": end_date.to_rfc3339(),
+            "paths": []
+        }))
+        .send()
+        .await
+        .expect("Failed to create period");
+
+    let response = ctx
+        .client
+        .get(&format!("{}/periods", ctx.base_url))
+        .bearer_auth(&school_admin.access_token)
+        .send()
+        .await
+        .expect("Failed to list periods");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    let result: serde_json::Value = parse_json(response).await;
+    assert!(result["periods"].as_array().unwrap().len() >= 1);
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_period_get_with_paths() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+    let school_id = ctx.create_test_school(&super_admin.access_token, "TEST203").await;
+    let school_admin = ctx.create_school_admin(school_id, "admin_period4@test.com").await;
+
+    let start_date = Utc::now();
+    let end_date = start_date + Duration::days(90);
+
+    let create_response = ctx
+        .client
+        .post(&format!("{}/periods", ctx.base_url))
+        .bearer_auth(&school_admin.access_token)
+        .json(&json!({
+            "academic_year": "2024/2025",
+            "level": "SMA",
+            "start_date": start_date.to_rfc3339(),
+            "end_date": end_date.to_rfc3339(),
+            "paths": [
+                {
+                    "path_type": "zonasi",
+                    "name": "Jalur Zonasi",
+                    "quota": 50,
+                    "scoring_config": {}
+                }
+            ]
+        }))
+        .send()
+        .await
+        .expect("Failed to create period");
+
+    let created: serde_json::Value = parse_json(create_response).await;
+    let period_id = created["period"]["id"].as_i64().unwrap();
+
+    let response = ctx
+        .client
+        .get(&format!("{}/periods/{}", ctx.base_url, period_id))
+        .bearer_auth(&school_admin.access_token)
+        .send()
+        .await
+        .expect("Failed to get period");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    let result: serde_json::Value = parse_json(response).await;
+    assert_eq!(result["period"]["id"], period_id);
+    assert!(result["paths"].as_array().unwrap().len() >= 1);
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_period_update() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+    let school_id = ctx.create_test_school(&super_admin.access_token, "TEST204").await;
+    let school_admin = ctx.create_school_admin(school_id, "admin_period5@test.com").await;
+
+    let start_date = Utc::now();
+    let end_date = start_date + Duration::days(90);
+
+    let create_response = ctx
+        .client
+        .post(&format!("{}/periods", ctx.base_url))
+        .bearer_auth(&school_admin.access_token)
+        .json(&json!({
+            "academic_year": "2024/2025",
+            "level": "SMA",
+            "start_date": start_date.to_rfc3339(),
+            "end_date": end_date.to_rfc3339(),
+            "paths": []
+        }))
+        .send()
+        .await
+        .expect("Failed to create period");
+
+    let created: serde_json::Value = parse_json(create_response).await;
+    let period_id = created["period"]["id"].as_i64().unwrap();
+
+    let new_end_date = end_date + Duration::days(30);
+    let response = ctx
+        .client
+        .put(&format!("{}/periods/{}", ctx.base_url, period_id))
+        .bearer_auth(&school_admin.access_token)
+        .json(&json!({
+            "end_date": new_end_date.to_rfc3339()
+        }))
+        .send()
+        .await
+        .expect("Failed to update period");
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_period_activate() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+    let school_id = ctx.create_test_school(&super_admin.access_token, "TEST205").await;
+    let school_admin = ctx.create_school_admin(school_id, "admin_period6@test.com").await;
+
+    let start_date = Utc::now();
+    let end_date = start_date + Duration::days(90);
+
+    let create_response = ctx
+        .client
+        .post(&format!("{}/periods", ctx.base_url))
+        .bearer_auth(&school_admin.access_token)
+        .json(&json!({
+            "academic_year": "2024/2025",
+            "level": "SMA",
+            "start_date": start_date.to_rfc3339(),
+            "end_date": end_date.to_rfc3339(),
+            "paths": []
+        }))
+        .send()
+        .await
+        .expect("Failed to create period");
+
+    let created: serde_json::Value = parse_json(create_response).await;
+    let period_id = created["period"]["id"].as_i64().unwrap();
+
+    let response = ctx
+        .client
+        .post(&format!("{}/periods/{}/activate", ctx.base_url, period_id))
+        .bearer_auth(&school_admin.access_token)
+        .send()
+        .await
+        .expect("Failed to activate period");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    let result: serde_json::Value = parse_json(response).await;
+    assert_eq!(result["status"], "active");
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_period_close() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+    let school_id = ctx.create_test_school(&super_admin.access_token, "TEST206").await;
+    let school_admin = ctx.create_school_admin(school_id, "admin_period7@test.com").await;
+
+    let start_date = Utc::now();
+    let end_date = start_date + Duration::days(90);
+
+    let create_response = ctx
+        .client
+        .post(&format!("{}/periods", ctx.base_url))
+        .bearer_auth(&school_admin.access_token)
+        .json(&json!({
+            "academic_year": "2024/2025",
+            "level": "SMA",
+            "start_date": start_date.to_rfc3339(),
+            "end_date": end_date.to_rfc3339(),
+            "paths": []
+        }))
+        .send()
+        .await
+        .expect("Failed to create period");
+
+    let created: serde_json::Value = parse_json(create_response).await;
+    let period_id = created["period"]["id"].as_i64().unwrap();
+
+    let response = ctx
+        .client
+        .post(&format!("{}/periods/{}/close", ctx.base_url, period_id))
+        .bearer_auth(&school_admin.access_token)
+        .send()
+        .await
+        .expect("Failed to close period");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    let result: serde_json::Value = parse_json(response).await;
+    assert_eq!(result["status"], "closed");
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_period_add_path() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+    let school_id = ctx.create_test_school(&super_admin.access_token, "TEST207").await;
+    let school_admin = ctx.create_school_admin(school_id, "admin_period8@test.com").await;
+
+    let start_date = Utc::now();
+    let end_date = start_date + Duration::days(90);
+
+    let create_response = ctx
+        .client
+        .post(&format!("{}/periods", ctx.base_url))
+        .bearer_auth(&school_admin.access_token)
+        .json(&json!({
+            "academic_year": "2024/2025",
+            "level": "SMA",
+            "start_date": start_date.to_rfc3339(),
+            "end_date": end_date.to_rfc3339(),
+            "paths": []
+        }))
+        .send()
+        .await
+        .expect("Failed to create period");
+
+    let created: serde_json::Value = parse_json(create_response).await;
+    let period_id = created["period"]["id"].as_i64().unwrap();
+
+    let response = ctx
+        .client
+        .post(&format!("{}/periods/{}/paths", ctx.base_url, period_id))
+        .bearer_auth(&school_admin.access_token)
+        .json(&json!({
+            "path_type": "afirmasi",
+            "name": "Jalur Afirmasi",
+            "quota": 20,
+            "description": "Jalur afirmasi untuk siswa kurang mampu",
+            "scoring_config": {}
+        }))
+        .send()
+        .await
+        .expect("Failed to add path");
+
+    assert_eq!(response.status(), StatusCode::CREATED);
+    
+    let path: serde_json::Value = parse_json(response).await;
+    assert_eq!(path["path_type"], "afirmasi");
+    assert_eq!(path["quota"], 20);
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_period_parent_cannot_create() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+    let school_id = ctx.create_test_school(&super_admin.access_token, "TEST208").await;
+    let parent = ctx.create_parent(school_id, "parent_period@test.com").await;
+
+    let start_date = Utc::now();
+    let end_date = start_date + Duration::days(90);
+
+    let response = ctx
+        .client
+        .post(&format!("{}/periods", ctx.base_url))
+        .bearer_auth(&parent.access_token)
+        .json(&json!({
+            "academic_year": "2024/2025",
+            "level": "SMA",
+            "start_date": start_date.to_rfc3339(),
+            "end_date": end_date.to_rfc3339(),
+            "paths": []
+        }))
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+
+    ctx.cleanup_test_data().await;
+}

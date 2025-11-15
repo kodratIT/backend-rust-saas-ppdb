@@ -5,6 +5,7 @@ use axum::{
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::api::middleware::auth::auth_middleware;
 use crate::api::middleware::rbac::require_school_admin;
@@ -24,14 +25,22 @@ pub fn routes(state: AppState) -> Router<AppState> {
         .route_layer(middleware::from_fn_with_state(state.clone(), auth_middleware))
 }
 
-#[derive(Debug, Deserialize)]
-struct GetRankingsQuery {
+/// Query parameters untuk mendapatkan ranking
+#[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct GetRankingsQuery {
+    /// ID jalur pendaftaran
+    #[schema(example = 1)]
     path_id: i32,
     
+    /// Nomor halaman
     #[serde(default = "default_page")]
+    #[schema(example = 1)]
     page: i64,
     
+    /// Jumlah item per halaman
     #[serde(default = "default_page_size")]
+    #[schema(example = 50)]
     page_size: i64,
 }
 
@@ -43,26 +52,59 @@ fn default_page_size() -> i64 {
     50
 }
 
-#[derive(Debug, Serialize)]
-struct CalculateScoresResponse {
+/// Response perhitungan skor
+#[derive(Debug, Serialize, ToSchema)]
+pub struct CalculateScoresResponse {
+    /// Pesan hasil
+    #[schema(example = "Successfully calculated scores for 100 registrations")]
     message: String,
+    
+    /// Total pendaftaran yang dihitung
+    #[schema(example = 100)]
     total_calculated: usize,
 }
 
-#[derive(Debug, Serialize)]
-struct UpdateRankingsResponse {
+/// Response update ranking
+#[derive(Debug, Serialize, ToSchema)]
+pub struct UpdateRankingsResponse {
+    /// Pesan hasil
+    #[schema(example = "Successfully updated rankings for 100 registrations")]
     message: String,
+    
+    /// Total pendaftaran yang diranking
+    #[schema(example = 100)]
     total_ranked: usize,
 }
 
-#[derive(Debug, Serialize)]
-struct RankingResponse {
+/// Response data ranking
+#[derive(Debug, Serialize, ToSchema)]
+pub struct RankingResponse {
+    /// ID pendaftaran
+    #[schema(example = 1)]
     id: i32,
+    
+    /// Nomor pendaftaran
+    #[schema(example = "PPDB-2024-001")]
     registration_number: Option<String>,
+    
+    /// NISN siswa
+    #[schema(example = "0012345678")]
     student_nisn: String,
+    
+    /// Nama siswa
+    #[schema(example = "Ahmad Fauzi")]
     student_name: String,
+    
+    /// Skor seleksi
+    #[schema(example = 85.5)]
     selection_score: Option<f64>,
+    
+    /// Peringkat
+    #[schema(example = 10)]
     ranking: Option<i32>,
+    
+    /// Status pendaftaran
+    #[schema(example = "accepted")]
     status: String,
 }
 
@@ -80,14 +122,46 @@ impl From<crate::models::registration::Registration> for RankingResponse {
     }
 }
 
-#[derive(Debug, Serialize)]
-struct RankingsResponse {
+/// Response daftar ranking
+#[derive(Debug, Serialize, ToSchema)]
+pub struct RankingsResponse {
+    /// Daftar ranking
     rankings: Vec<RankingResponse>,
+    
+    /// Total data
+    #[schema(example = 100)]
     total: usize,
+    
+    /// Halaman saat ini
+    #[schema(example = 1)]
     page: i64,
+    
+    /// Jumlah item per halaman
+    #[schema(example = 50)]
     page_size: i64,
 }
 
+/// Hitung skor seleksi
+///
+/// Endpoint ini digunakan untuk menghitung skor seleksi semua pendaftaran dalam periode.
+/// Hanya dapat diakses oleh admin sekolah.
+#[utoipa::path(
+    post,
+    path = "/api/selection/periods/{period_id}/calculate-scores",
+    tag = "Selection",
+    params(
+        ("period_id" = i32, Path, description = "ID periode")
+    ),
+    responses(
+        (status = 200, description = "Skor berhasil dihitung", body = CalculateScoresResponse),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 403, description = "Tidak memiliki akses"),
+        (status = 404, description = "Periode tidak ditemukan")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn calculate_scores(
     State(state): State<AppState>,
     Path(period_id): Path<i32>,
@@ -111,6 +185,27 @@ async fn calculate_scores(
     }))
 }
 
+/// Update ranking
+///
+/// Endpoint ini digunakan untuk mengupdate ranking berdasarkan skor seleksi.
+/// Hanya dapat diakses oleh admin sekolah.
+#[utoipa::path(
+    post,
+    path = "/api/selection/periods/{period_id}/update-rankings",
+    tag = "Selection",
+    params(
+        ("period_id" = i32, Path, description = "ID periode")
+    ),
+    responses(
+        (status = 200, description = "Ranking berhasil diupdate", body = UpdateRankingsResponse),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 403, description = "Tidak memiliki akses"),
+        (status = 404, description = "Periode tidak ditemukan")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn update_rankings(
     State(state): State<AppState>,
     Path(period_id): Path<i32>,
@@ -132,6 +227,27 @@ async fn update_rankings(
     }))
 }
 
+/// Mendapatkan daftar ranking
+///
+/// Endpoint ini mengembalikan daftar ranking untuk periode dan jalur tertentu.
+#[utoipa::path(
+    get,
+    path = "/api/selection/periods/{period_id}/rankings",
+    tag = "Selection",
+    params(
+        ("period_id" = i32, Path, description = "ID periode"),
+        GetRankingsQuery
+    ),
+    responses(
+        (status = 200, description = "Daftar ranking berhasil diambil", body = RankingsResponse),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 403, description = "Tidak memiliki akses"),
+        (status = 404, description = "Periode tidak ditemukan")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn get_rankings(
     State(state): State<AppState>,
     Path(period_id): Path<i32>,
@@ -159,6 +275,26 @@ async fn get_rankings(
     }))
 }
 
+/// Mendapatkan statistik ranking
+///
+/// Endpoint ini mengembalikan statistik ranking per jalur untuk periode tertentu.
+#[utoipa::path(
+    get,
+    path = "/api/selection/periods/{period_id}/stats",
+    tag = "Selection",
+    params(
+        ("period_id" = i32, Path, description = "ID periode")
+    ),
+    responses(
+        (status = 200, description = "Statistik ranking berhasil diambil", body = Vec<PathRankingStats>),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 403, description = "Tidak memiliki akses"),
+        (status = 404, description = "Periode tidak ditemukan")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn get_ranking_stats(
     State(state): State<AppState>,
     Path(period_id): Path<i32>,

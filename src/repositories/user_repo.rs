@@ -1,5 +1,4 @@
 use sqlx::PgPool;
-use uuid::Uuid;
 
 use crate::models::user::User;
 use crate::utils::error::{AppError, AppResult};
@@ -37,6 +36,7 @@ impl UserRepository {
         .bind(phone)
         .bind(nik)
         .bind(role)
+        .persistent(false)  // Disable prepared statement
         .fetch_one(&self.pool)
         .await
         .map_err(|e| match e {
@@ -56,6 +56,7 @@ impl UserRepository {
             "#,
         )
         .bind(email)
+        .persistent(false)  // Disable prepared statement
         .fetch_optional(&self.pool)
         .await?;
 
@@ -69,6 +70,7 @@ impl UserRepository {
             "#,
         )
         .bind(id)
+        .persistent(false)  // Disable prepared statement
         .fetch_optional(&self.pool)
         .await?;
 
@@ -80,12 +82,14 @@ impl UserRepository {
         id: i32,
         full_name: Option<&str>,
         phone: Option<&str>,
+        nik: Option<&str>,
     ) -> AppResult<User> {
         let user = sqlx::query_as::<_, User>(
             r#"
             UPDATE users
             SET full_name = COALESCE($2, full_name),
                 phone = COALESCE($3, phone),
+                nik = COALESCE($4, nik),
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = $1
             RETURNING *
@@ -94,10 +98,118 @@ impl UserRepository {
         .bind(id)
         .bind(full_name)
         .bind(phone)
+        .bind(nik)
         .fetch_one(&self.pool)
         .await?;
 
         Ok(user)
+    }
+
+    pub async fn find_all(
+        &self,
+        school_id: Option<i32>,
+        page_size: i64,
+        offset: i64,
+        search: Option<String>,
+        role: Option<String>,
+    ) -> AppResult<Vec<User>> {
+        let mut conditions = vec!["1=1".to_string()];
+        let mut param_index = 3; // Start from 3 because 1 and 2 are for LIMIT and OFFSET
+        
+        if school_id.is_some() {
+            conditions.push(format!("school_id = ${}", param_index));
+            param_index += 1;
+        }
+        
+        if search.is_some() {
+            conditions.push(format!("(full_name ILIKE '%' || ${} || '%' OR email ILIKE '%' || ${} || '%')", param_index, param_index));
+            param_index += 1;
+        }
+        
+        if role.is_some() {
+            conditions.push(format!("role = ${}", param_index));
+        }
+        
+        let query = format!(
+            "SELECT * FROM users WHERE {} ORDER BY created_at DESC LIMIT $1 OFFSET $2",
+            conditions.join(" AND ")
+        );
+
+        let mut q = sqlx::query_as::<_, User>(&query)
+            .bind(page_size)
+            .bind(offset);
+            
+        if let Some(sid) = school_id {
+            q = q.bind(sid);
+        }
+        
+        if let Some(s) = search {
+            q = q.bind(s);
+        }
+        
+        if let Some(r) = role {
+            q = q.bind(r);
+        }
+
+        let users = q.fetch_all(&self.pool).await?;
+
+        Ok(users)
+    }
+
+    pub async fn count_all(
+        &self,
+        school_id: Option<i32>,
+        search: Option<String>,
+        role: Option<String>,
+    ) -> AppResult<i64> {
+        let mut conditions = vec!["1=1".to_string()];
+        let mut param_index = 1;
+        
+        if school_id.is_some() {
+            conditions.push(format!("school_id = ${}", param_index));
+            param_index += 1;
+        }
+        
+        if search.is_some() {
+            conditions.push(format!("(full_name ILIKE '%' || ${} || '%' OR email ILIKE '%' || ${} || '%')", param_index, param_index));
+            param_index += 1;
+        }
+        
+        if role.is_some() {
+            conditions.push(format!("role = ${}", param_index));
+        }
+
+        let query = format!(
+            "SELECT COUNT(*) FROM users WHERE {}",
+            conditions.join(" AND ")
+        );
+
+        let mut q = sqlx::query_scalar::<_, i64>(&query);
+            
+        if let Some(sid) = school_id {
+            q = q.bind(sid);
+        }
+        
+        if let Some(s) = search {
+            q = q.bind(s);
+        }
+        
+        if let Some(r) = role {
+            q = q.bind(r);
+        }
+
+        let count = q.fetch_one(&self.pool).await?;
+
+        Ok(count)
+    }
+
+    pub async fn delete_user(&self, id: i32) -> AppResult<()> {
+        sqlx::query("DELETE FROM users WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
     }
 
     pub async fn set_email_verified(&self, id: i32) -> AppResult<User> {

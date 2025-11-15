@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use sqlx::PgPool;
 
 use crate::models::period::{Period, RegistrationPath};
@@ -18,14 +18,15 @@ impl PeriodRepository {
         school_id: i32,
         academic_year: &str,
         level: &str,
-        start_date: DateTime<Utc>,
-        end_date: DateTime<Utc>,
-        reenrollment_deadline: Option<DateTime<Utc>>,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+        reenrollment_deadline: Option<NaiveDate>,
     ) -> AppResult<Period> {
+        // Use start_date and end_date for registration dates as well
         let period = sqlx::query_as::<_, Period>(
             r#"
-            INSERT INTO periods (school_id, academic_year, level, start_date, end_date, reenrollment_deadline, status)
-            VALUES ($1, $2, $3, $4, $5, $6, 'draft')
+            INSERT INTO periods (school_id, academic_year, level, start_date, end_date, registration_start, registration_end, reenrollment_deadline, status)
+            VALUES ($1, $2, $3, $4, $5, $4, $5, $6, 'draft')
             RETURNING *
             "#,
         )
@@ -172,10 +173,10 @@ impl PeriodRepository {
     pub async fn update_period(
         &self,
         id: i32,
-        start_date: Option<DateTime<Utc>>,
-        end_date: Option<DateTime<Utc>>,
-        announcement_date: Option<DateTime<Utc>>,
-        reenrollment_deadline: Option<DateTime<Utc>>,
+        start_date: Option<NaiveDate>,
+        end_date: Option<NaiveDate>,
+        announcement_date: Option<NaiveDate>,
+        reenrollment_deadline: Option<NaiveDate>,
     ) -> AppResult<Period> {
         let period = sqlx::query_as::<_, Period>(
             r#"

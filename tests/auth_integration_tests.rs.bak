@@ -1,0 +1,333 @@
+mod test_helpers;
+
+use reqwest::StatusCode;
+use serde_json::json;
+use test_helpers::{parse_json, TestAuthResponse, TestContext};
+
+#[allow(dead_code)]
+use test_helpers::TestUserResponse;
+
+#[tokio::test]
+async fn test_auth_register_success() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let (status, response) = ctx.post(
+        "/api/v1/auth/register",
+        json!({
+            "email": "newuser@test.com",
+            "password": "password123",
+            "full_name": "New User",
+            "phone": "081234567890",
+            "nik": "1234567890123456"
+        }),
+        None
+    ).await;
+
+    assert_eq!(status, StatusCode::CREATED, "Response: {:?}", response);
+    assert_eq!(response["email"], "newuser@test.com");
+    assert_eq!(response["full_name"], "New User");
+    assert_eq!(response["role"], "parent");
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_auth_register_invalid_email() {
+    let ctx = TestContext::new().await;
+
+    let (status, _response) = ctx.post(
+        "/api/v1/auth/register",
+        json!({
+            "email": "invalid-email",
+            "password": "password123",
+            "full_name": "Test User"
+        }),
+        None
+    ).await;
+
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn test_auth_register_short_password() {
+    let ctx = TestContext::new().await;
+
+    let (status, _response) = ctx.post(
+        "/api/v1/auth/register",
+        json!({
+            "email": "test@test.com",
+            "password": "short",
+            "full_name": "Test User"
+        }),
+        None
+    ).await;
+
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn test_auth_register_duplicate_email() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    // First registration
+    ctx.post(
+        "/api/v1/auth/register",
+        json!({
+            "email": "duplicate@test.com",
+            "password": "password123",
+            "full_name": "First User"
+        }),
+        None
+    ).await;
+
+    // Duplicate registration
+    let (status, _response) = ctx.post(
+        "/api/v1/auth/register",
+        json!({
+            "email": "duplicate@test.com",
+            "password": "password123",
+            "full_name": "Second User"
+        }),
+        None
+    ).await;
+
+    assert_eq!(status, StatusCode::CONFLICT);
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_auth_login_success() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    // Register user first
+    ctx.client
+        .post(&format!("{}/auth/register", ctx.base_url))
+        .json(&json!({
+            "email": "logintest@test.com",
+            "password": "password123",
+            "full_name": "Login Test User"
+        }))
+        .send()
+        .await
+        .expect("Failed to register");
+
+    // Mark email as verified
+    sqlx::query!("UPDATE users SET email_verified = true WHERE email = $1", "logintest@test.com")
+        .execute(&ctx.db)
+        .await
+        .expect("Failed to verify email");
+
+    // Login
+    let response = ctx
+        .client
+        .post(&format!("{}/auth/login", ctx.base_url))
+        .json(&json!({
+            "email": "logintest@test.com",
+            "password": "password123"
+        }))
+        .send()
+        .await
+        .expect("Failed to login");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    let auth_response: TestAuthResponse = parse_json(response).await;
+    assert!(!auth_response.access_token.is_empty());
+    assert!(!auth_response.refresh_token.is_empty());
+    assert_eq!(auth_response.token_type, "Bearer");
+    assert_eq!(auth_response.user.email, "logintest@test.com");
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_auth_login_wrong_password() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    // Register user
+    ctx.client
+        .post(&format!("{}/auth/register", ctx.base_url))
+        .json(&json!({
+            "email": "wrongpass@test.com",
+            "password": "password123",
+            "full_name": "Wrong Pass User"
+        }))
+        .send()
+        .await
+        .expect("Failed to register");
+
+    // Login with wrong password
+    let response = ctx
+        .client
+        .post(&format!("{}/auth/login", ctx.base_url))
+        .json(&json!({
+            "email": "wrongpass@test.com",
+            "password": "wrongpassword"
+        }))
+        .send()
+        .await
+        .expect("Failed to login");
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_auth_login_nonexistent_user() {
+    let ctx = TestContext::new().await;
+
+    let response = ctx
+        .client
+        .post(&format!("{}/auth/login", ctx.base_url))
+        .json(&json!({
+            "email": "nonexistent@test.com",
+            "password": "password123"
+        }))
+        .send()
+        .await
+        .expect("Failed to login");
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn test_auth_get_current_user() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+
+    let response = ctx
+        .client
+        .get(&format!("{}/auth/me", ctx.base_url))
+        .bearer_auth(&super_admin.access_token)
+        .send()
+        .await
+        .expect("Failed to get current user");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    let user: serde_json::Value = parse_json(response).await;
+    assert_eq!(user["email"], super_admin.email);
+    assert_eq!(user["role"], "super_admin");
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_auth_get_current_user_unauthorized() {
+    let ctx = TestContext::new().await;
+
+    let response = ctx
+        .client
+        .get(&format!("{}/auth/me", ctx.base_url))
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn test_auth_refresh_token() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+
+    let response = ctx
+        .client
+        .post(&format!("{}/auth/refresh", ctx.base_url))
+        .json(&json!({
+            "refresh_token": super_admin.refresh_token
+        }))
+        .send()
+        .await
+        .expect("Failed to refresh token");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    let refresh_response: serde_json::Value = parse_json(response).await;
+    assert!(!refresh_response["access_token"].as_str().unwrap().is_empty());
+    assert_eq!(refresh_response["token_type"], "Bearer");
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_auth_refresh_token_invalid() {
+    let ctx = TestContext::new().await;
+
+    let response = ctx
+        .client
+        .post(&format!("{}/auth/refresh", ctx.base_url))
+        .json(&json!({
+            "refresh_token": "invalid_token"
+        }))
+        .send()
+        .await
+        .expect("Failed to refresh token");
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn test_auth_logout() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+
+    let response = ctx
+        .client
+        .post(&format!("{}/auth/logout", ctx.base_url))
+        .bearer_auth(&super_admin.access_token)
+        .send()
+        .await
+        .expect("Failed to logout");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    let message: serde_json::Value = parse_json(response).await;
+    assert!(message["message"].as_str().unwrap().contains("Logged out"));
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_auth_forgot_password() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    // Register user
+    ctx.client
+        .post(&format!("{}/auth/register", ctx.base_url))
+        .json(&json!({
+            "email": "forgot@test.com",
+            "password": "password123",
+            "full_name": "Forgot Password User"
+        }))
+        .send()
+        .await
+        .expect("Failed to register");
+
+    let response = ctx
+        .client
+        .post(&format!("{}/auth/forgot-password", ctx.base_url))
+        .json(&json!({
+            "email": "forgot@test.com"
+        }))
+        .send()
+        .await
+        .expect("Failed to request password reset");
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    ctx.cleanup_test_data().await;
+}

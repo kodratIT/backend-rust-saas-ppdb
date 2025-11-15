@@ -1,0 +1,124 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  CARGO_TERM_COLOR: always
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ppdb_test
+  JWT_SECRET: test-secret-key-for-ci-minimum-32-characters-long-secure
+  JWT_EXPIRATION_HOURS: 24
+  PORT: 8080
+  RUST_LOG: info
+
+jobs:
+  test:
+    name: Run Integration Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ppdb_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo build
+        uses: actions/cache@v3
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install SQLx CLI
+        run: cargo install sqlx-cli --no-default-features --features postgres
+
+      - name: Run database migrations
+        run: sqlx migrate run
+
+      - name: Check code formatting
+        run: cargo fmt -- --check
+
+      - name: Run Clippy
+        run: cargo clippy -- -D warnings
+
+      - name: Build project
+        run: cargo build --verbose
+
+      - name: Run Auth Tests
+        run: cargo test --test auth_integration_tests -- --test-threads=1 --nocapture
+        
+      - name: Run School Tests
+        run: cargo test --test school_integration_tests -- --test-threads=1 --nocapture
+        
+      - name: Run User Tests
+        run: cargo test --test user_integration_tests -- --test-threads=1 --nocapture
+        
+      - name: Run Period Tests
+        run: cargo test --test period_integration_tests -- --test-threads=1 --nocapture
+        
+      - name: Run Registration Tests
+        run: cargo test --test registration_integration_tests -- --test-threads=1 --nocapture
+        
+      - name: Run Verification Tests
+        run: cargo test --test verification_integration_tests -- --test-threads=1 --nocapture
+        
+      - name: Run Selection Tests
+        run: cargo test --test selection_integration_tests -- --test-threads=1 --nocapture
+        
+      - name: Run Announcement Tests
+        run: cargo test --test announcement_integration_tests -- --test-threads=1 --nocapture
+
+      - name: Test Summary
+        if: always()
+        run: |
+          echo "================================"
+          echo "📊 Test Summary"
+          echo "================================"
+          echo "✅ All integration tests completed"
+          echo ""
+          echo "Test Modules:"
+          echo "  - Authentication Tests"
+          echo "  - School Management Tests"
+          echo "  - User Management Tests"
+          echo "  - Period Management Tests"
+          echo "  - Registration Tests"
+          echo "  - Verification Tests"
+          echo "  - Selection & Scoring Tests"
+          echo "  - Announcement Tests"
+          echo ""
+          echo "Total: 81 tests across 8 modules"

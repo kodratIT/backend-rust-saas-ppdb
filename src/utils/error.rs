@@ -38,17 +38,20 @@ impl IntoResponse for AppError {
         let (status, error_message) = match self {
             AppError::Database(ref e) => {
                 tracing::error!("Database error: {:?}", e);
-                (StatusCode::INTERNAL_SERVER_ERROR, "Database error")
+                // For development: show detailed error
+                let detail = format!("Database error: {}", e);
+                eprintln!("🔴 DATABASE ERROR: {}", detail);
+                (StatusCode::INTERNAL_SERVER_ERROR, detail)
             }
-            AppError::Validation(ref msg) => (StatusCode::BAD_REQUEST, msg.as_str()),
-            AppError::Authentication(ref msg) => (StatusCode::UNAUTHORIZED, msg.as_str()),
-            AppError::Authorization(ref msg) => (StatusCode::FORBIDDEN, msg.as_str()),
-            AppError::Forbidden(ref msg) => (StatusCode::FORBIDDEN, msg.as_str()),
-            AppError::NotFound(ref msg) => (StatusCode::NOT_FOUND, msg.as_str()),
-            AppError::Conflict(ref msg) => (StatusCode::CONFLICT, msg.as_str()),
+            AppError::Validation(ref msg) => (StatusCode::BAD_REQUEST, msg.to_string()),
+            AppError::Authentication(ref msg) => (StatusCode::UNAUTHORIZED, msg.to_string()),
+            AppError::Authorization(ref msg) => (StatusCode::FORBIDDEN, msg.to_string()),
+            AppError::Forbidden(ref msg) => (StatusCode::FORBIDDEN, msg.to_string()),
+            AppError::NotFound(ref msg) => (StatusCode::NOT_FOUND, msg.to_string()),
+            AppError::Conflict(ref msg) => (StatusCode::CONFLICT, msg.to_string()),
             AppError::Internal(ref msg) => {
                 tracing::error!("Internal error: {}", msg);
-                (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error")
+                (StatusCode::INTERNAL_SERVER_ERROR, msg.to_string())
             }
         };
 

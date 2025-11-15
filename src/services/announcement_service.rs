@@ -331,48 +331,125 @@ impl AnnouncementService {
     }
 }
 
-#[derive(Debug, serde::Serialize)]
+/// Hasil proses seleksi
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
 pub struct SelectionResult {
+    /// Total yang diterima
+    #[schema(example = 100)]
     pub total_accepted: i32,
+    
+    /// Total yang ditolak
+    #[schema(example = 50)]
     pub total_rejected: i32,
 }
 
-#[derive(Debug, serde::Serialize)]
+/// Hasil pengumuman
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
 pub struct AnnouncementResult {
+    /// Total notifikasi terkirim
+    #[schema(example = 150)]
     pub total_notified: i32,
+    
+    /// Notifikasi diterima terkirim
+    #[schema(example = 100)]
     pub accepted_notified: i32,
+    
+    /// Notifikasi ditolak terkirim
+    #[schema(example = 50)]
     pub rejected_notified: i32,
 }
 
-#[derive(Debug, serde::Serialize)]
+/// Response cek hasil seleksi
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
 pub struct ResultCheckResponse {
+    /// Nomor pendaftaran
+    #[schema(example = "PPDB-2024-001")]
     pub registration_number: String,
+    
+    /// Nama siswa
+    #[schema(example = "Ahmad Fauzi")]
     pub student_name: String,
+    
+    /// NISN siswa
+    #[schema(example = "0012345678")]
     pub student_nisn: String,
+    
+    /// Nama jalur
+    #[schema(example = "Jalur Zonasi")]
     pub path_name: String,
+    
+    /// Skor seleksi
+    #[schema(example = 85.5)]
     pub selection_score: Option<f64>,
+    
+    /// Peringkat
+    #[schema(example = 10)]
     pub ranking: Option<i32>,
+    
+    /// Status (accepted/rejected)
+    #[schema(example = "accepted")]
     pub status: String,
+    
+    /// Alasan penolakan
+    #[schema(example = "Kuota penuh")]
     pub rejection_reason: Option<String>,
-    pub announcement_date: Option<chrono::DateTime<chrono::Utc>>,
-    pub reenrollment_deadline: Option<chrono::DateTime<chrono::Utc>>,
+    
+    /// Tanggal pengumuman
+    #[schema(value_type = Option<String>, example = "2024-08-01")]
+    pub announcement_date: Option<chrono::NaiveDate>,
+    
+    /// Batas waktu daftar ulang
+    #[schema(value_type = Option<String>, example = "2024-08-15")]
+    pub reenrollment_deadline: Option<chrono::NaiveDate>,
 }
 
-#[derive(Debug, serde::Serialize)]
+/// Ringkasan seleksi
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
 pub struct SelectionSummary {
+    /// ID periode
+    #[schema(example = 1)]
     pub period_id: i32,
+    
+    /// Total terverifikasi
+    #[schema(example = 150)]
     pub verified: i64,
+    
+    /// Total diterima
+    #[schema(example = 100)]
     pub accepted: i64,
+    
+    /// Total ditolak
+    #[schema(example = 50)]
     pub rejected: i64,
+    
+    /// Ringkasan per jalur
     pub paths: Vec<PathSelectionSummary>,
 }
 
-#[derive(Debug, serde::Serialize)]
+/// Ringkasan seleksi per jalur
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
 pub struct PathSelectionSummary {
+    /// ID jalur
+    #[schema(example = 1)]
     pub path_id: i32,
+    
+    /// Nama jalur
+    #[schema(example = "Jalur Zonasi")]
     pub path_name: String,
+    
+    /// Kuota jalur
+    #[schema(example = 100)]
     pub quota: i32,
+    
+    /// Total diterima
+    #[schema(example = 80)]
     pub accepted: i64,
+    
+    /// Total ditolak
+    #[schema(example = 20)]
     pub rejected: i64,
+    
+    /// Sisa kuota
+    #[schema(example = 20)]
     pub remaining_quota: i64,
 }

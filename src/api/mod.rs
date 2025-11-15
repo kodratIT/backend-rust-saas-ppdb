@@ -2,9 +2,12 @@ use axum::Router;
 
 pub mod announcements;
 pub mod auth;
+pub mod docs;
+pub mod health;
 pub mod middleware;
 pub mod periods;
 pub mod registrations;
+pub mod schemas;
 pub mod schools;
 pub mod selection;
 pub mod users;

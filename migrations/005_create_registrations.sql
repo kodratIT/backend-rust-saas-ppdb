@@ -5,23 +5,36 @@ CREATE TABLE registrations (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     period_id INTEGER NOT NULL REFERENCES periods(id) ON DELETE CASCADE,
     path_id INTEGER NOT NULL REFERENCES registration_paths(id),
-    registration_number VARCHAR(50) UNIQUE NOT NULL,
+    registration_number VARCHAR(50) UNIQUE,
     
     -- Student Data
     student_nisn VARCHAR(20) NOT NULL,
-    student_nik VARCHAR(20) NOT NULL,
     student_name VARCHAR(255) NOT NULL,
-    student_birth_place VARCHAR(100),
-    student_birth_date DATE,
     student_gender VARCHAR(10) CHECK (student_gender IN ('L', 'P')),
+    student_birth_place VARCHAR(100),
+    student_birth_date TIMESTAMPTZ,
+    student_religion VARCHAR(50),
     student_address TEXT,
-    previous_school VARCHAR(255),
+    student_phone VARCHAR(20),
+    student_email VARCHAR(255),
+    
+    -- Parent Data
+    parent_name VARCHAR(255) NOT NULL,
+    parent_nik VARCHAR(20) NOT NULL,
+    parent_phone VARCHAR(20) NOT NULL,
+    parent_occupation VARCHAR(100),
+    parent_income VARCHAR(50),
+    
+    -- Previous School Data
+    previous_school_name VARCHAR(255),
+    previous_school_npsn VARCHAR(20),
+    previous_school_address TEXT,
     
     -- Path-specific data (JSONB for flexibility)
     path_data JSONB,
     
     -- Selection
-    selection_score DECIMAL(10, 2),
+    selection_score DOUBLE PRECISION,
     ranking INTEGER,
     
     -- Status
@@ -33,11 +46,11 @@ CREATE TABLE registrations (
     admin_notes TEXT,
     
     -- Timestamps
-    submitted_at TIMESTAMP,
-    verified_at TIMESTAMP,
+    submitted_at TIMESTAMPTZ,
+    verified_at TIMESTAMPTZ,
     verified_by INTEGER REFERENCES users(id),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create indexes

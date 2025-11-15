@@ -3,11 +3,12 @@ CREATE TABLE registration_paths (
     id SERIAL PRIMARY KEY,
     period_id INTEGER NOT NULL REFERENCES periods(id) ON DELETE CASCADE,
     path_type VARCHAR(50) NOT NULL CHECK (path_type IN ('zonasi', 'prestasi', 'afirmasi', 'perpindahan_tugas')),
+    name VARCHAR(255) NOT NULL,
     quota INTEGER NOT NULL,
     description TEXT,
     scoring_config JSONB,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create indexes

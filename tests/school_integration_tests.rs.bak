@@ -1,0 +1,316 @@
+mod test_helpers;
+
+use reqwest::StatusCode;
+use serde_json::json;
+use test_helpers::{parse_json, TestContext};
+
+#[tokio::test]
+async fn test_school_create_success() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+
+    let response = ctx
+        .client
+        .post(&format!("{}/schools", ctx.base_url))
+        .bearer_auth(&super_admin.access_token)
+        .json(&json!({
+            "name": "Test School Create",
+            "npsn": "12345678",
+            "code": "TEST001",
+            "address": "Test Address",
+            "phone": "081234567890",
+            "email": "school001@test.com"
+        }))
+        .send()
+        .await
+        .expect("Failed to create school");
+
+    assert_eq!(response.status(), StatusCode::CREATED);
+    
+    let school: serde_json::Value = parse_json(response).await;
+    assert_eq!(school["name"], "Test School Create");
+    assert_eq!(school["npsn"], "12345678");
+    assert_eq!(school["code"], "TEST001");
+    assert_eq!(school["status"], "active");
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_school_create_invalid_npsn() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+
+    let response = ctx
+        .client
+        .post(&format!("{}/schools", ctx.base_url))
+        .bearer_auth(&super_admin.access_token)
+        .json(&json!({
+            "name": "Test School",
+            "npsn": "123", // Invalid: too short
+            "code": "TEST002"
+        }))
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_school_create_unauthorized() {
+    let ctx = TestContext::new().await;
+
+    let response = ctx
+        .client
+        .post(&format!("{}/schools", ctx.base_url))
+        .json(&json!({
+            "name": "Test School",
+            "npsn": "12345678",
+            "code": "TEST003"
+        }))
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn test_school_create_non_super_admin() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+    let school_id = ctx.create_test_school(&super_admin.access_token, "TEST004").await;
+    let school_admin = ctx.create_school_admin(school_id, "schooladmin@test.com").await;
+
+    let response = ctx
+        .client
+        .post(&format!("{}/schools", ctx.base_url))
+        .bearer_auth(&school_admin.access_token)
+        .json(&json!({
+            "name": "Another School",
+            "npsn": "87654321",
+            "code": "TEST005"
+        }))
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_school_list() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+    
+    // Create multiple schools
+    ctx.create_test_school(&super_admin.access_token, "TEST010").await;
+    ctx.create_test_school(&super_admin.access_token, "TEST011").await;
+    ctx.create_test_school(&super_admin.access_token, "TEST012").await;
+
+    let response = ctx
+        .client
+        .get(&format!("{}/schools?page=1&page_size=10", ctx.base_url))
+        .bearer_auth(&super_admin.access_token)
+        .send()
+        .await
+        .expect("Failed to list schools");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    let result: serde_json::Value = parse_json(response).await;
+    assert!(result["schools"].as_array().unwrap().len() >= 3);
+    assert!(result["total"].as_i64().unwrap() >= 3);
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_school_list_with_search() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+    
+    ctx.create_test_school(&super_admin.access_token, "SEARCH01").await;
+
+    let response = ctx
+        .client
+        .get(&format!("{}/schools?search=SEARCH01", ctx.base_url))
+        .bearer_auth(&super_admin.access_token)
+        .send()
+        .await
+        .expect("Failed to search schools");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    let result: serde_json::Value = parse_json(response).await;
+    let schools = result["schools"].as_array().unwrap();
+    assert!(schools.iter().any(|s| s["code"] == "SEARCH01"));
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_school_get_by_id() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+    let school_id = ctx.create_test_school(&super_admin.access_token, "TEST020").await;
+
+    let response = ctx
+        .client
+        .get(&format!("{}/schools/{}", ctx.base_url, school_id))
+        .bearer_auth(&super_admin.access_token)
+        .send()
+        .await
+        .expect("Failed to get school");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    let school: serde_json::Value = parse_json(response).await;
+    assert_eq!(school["id"], school_id);
+    assert_eq!(school["code"], "TEST020");
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_school_get_nonexistent() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+
+    let response = ctx
+        .client
+        .get(&format!("{}/schools/99999", ctx.base_url))
+        .bearer_auth(&super_admin.access_token)
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_school_update() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+    let school_id = ctx.create_test_school(&super_admin.access_token, "TEST030").await;
+
+    let response = ctx
+        .client
+        .put(&format!("{}/schools/{}", ctx.base_url, school_id))
+        .bearer_auth(&super_admin.access_token)
+        .json(&json!({
+            "name": "Updated School Name",
+            "address": "Updated Address",
+            "phone": "089876543210"
+        }))
+        .send()
+        .await
+        .expect("Failed to update school");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    let school: serde_json::Value = parse_json(response).await;
+    assert_eq!(school["name"], "Updated School Name");
+    assert_eq!(school["address"], "Updated Address");
+    assert_eq!(school["phone"], "089876543210");
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_school_deactivate() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+    let school_id = ctx.create_test_school(&super_admin.access_token, "TEST040").await;
+
+    let response = ctx
+        .client
+        .delete(&format!("{}/schools/{}", ctx.base_url, school_id))
+        .bearer_auth(&super_admin.access_token)
+        .send()
+        .await
+        .expect("Failed to deactivate school");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    // Verify school is deactivated
+    let get_response = ctx
+        .client
+        .get(&format!("{}/schools/{}", ctx.base_url, school_id))
+        .bearer_auth(&super_admin.access_token)
+        .send()
+        .await
+        .expect("Failed to get school");
+
+    let school: serde_json::Value = parse_json(get_response).await;
+    assert_eq!(school["status"], "inactive");
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_school_activate() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+    let school_id = ctx.create_test_school(&super_admin.access_token, "TEST050").await;
+
+    // Deactivate first
+    ctx.client
+        .delete(&format!("{}/schools/{}", ctx.base_url, school_id))
+        .bearer_auth(&super_admin.access_token)
+        .send()
+        .await
+        .expect("Failed to deactivate");
+
+    // Activate
+    let response = ctx
+        .client
+        .post(&format!("{}/schools/{}/activate", ctx.base_url, school_id))
+        .bearer_auth(&super_admin.access_token)
+        .send()
+        .await
+        .expect("Failed to activate school");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    // Verify school is active
+    let get_response = ctx
+        .client
+        .get(&format!("{}/schools/{}", ctx.base_url, school_id))
+        .bearer_auth(&super_admin.access_token)
+        .send()
+        .await
+        .expect("Failed to get school");
+
+    let school: serde_json::Value = parse_json(get_response).await;
+    assert_eq!(school["status"], "active");
+
+    ctx.cleanup_test_data().await;
+}

@@ -1,12 +1,11 @@
 use axum::{
-    extract::{Path, Query, Request, State},
-    http::StatusCode,
+    extract::{Path, Query, State},
     middleware,
     routing::{get, post},
-    Json, Router,
+    Extension, Json, Router,
 };
 use serde::{Deserialize, Serialize};
-use validator::Validate;
+use utoipa::ToSchema;
 
 use crate::api::middleware::auth::{auth_middleware, AuthUser};
 use crate::api::middleware::rbac::require_school_admin;
@@ -26,15 +25,26 @@ pub fn routes(state: AppState) -> Router<AppState> {
         .route_layer(middleware::from_fn_with_state(state.clone(), auth_middleware))
 }
 
-#[derive(Debug, Deserialize)]
-struct PendingVerificationsQuery {
+/// Query untuk pending verifications
+#[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct PendingVerificationsQuery {
+    /// Nomor halaman
     #[serde(default = "default_page")]
+    #[schema(example = 1)]
     page: i64,
     
+    /// Jumlah item per halaman
     #[serde(default = "default_page_size")]
+    #[schema(example = 10)]
     page_size: i64,
     
+    /// Filter berdasarkan ID periode
+    #[schema(example = 1)]
     period_id: Option<i32>,
+    
+    /// Filter berdasarkan ID jalur
+    #[schema(example = 1)]
     path_id: Option<i32>,
 }
 
@@ -46,48 +56,96 @@ fn default_page_size() -> i64 {
     10
 }
 
-#[derive(Debug, Deserialize)]
-struct StatsQuery {
+/// Query untuk statistik verifikasi
+#[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct StatsQuery {
+    /// Filter berdasarkan ID periode
+    #[schema(example = 1)]
     period_id: Option<i32>,
 }
 
-#[derive(Debug, Deserialize, Validate)]
-struct RejectRegistrationRequest {
-    #[validate(length(min = 10))]
+/// Request untuk menolak pendaftaran
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct RejectRegistrationRequest {
+    /// Alasan penolakan (minimal 10 karakter)
+    #[schema(example = "Dokumen tidak lengkap atau tidak sesuai")]
     reason: String,
 }
 
-#[derive(Debug, Deserialize, Validate)]
-struct VerifyDocumentRequest {
-    #[validate(custom = "validate_verification_status")]
+/// Request untuk verifikasi dokumen
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct VerifyDocumentRequest {
+    /// Status verifikasi (approved/rejected)
+    #[schema(example = "approved")]
     verification_status: String,
     
+    /// Catatan verifikasi (opsional)
+    #[schema(example = "Dokumen sudah sesuai")]
     verification_notes: Option<String>,
 }
 
-fn validate_verification_status(status: &str) -> Result<(), validator::ValidationError> {
-    match status {
-        "approved" | "rejected" => Ok(()),
-        _ => Err(validator::ValidationError::new("invalid_verification_status")),
-    }
-}
-
-#[derive(Debug, Serialize)]
-struct RegistrationResponse {
+/// Response data pendaftaran (simplified)
+#[derive(Debug, Serialize, ToSchema)]
+pub struct RegistrationResponse {
+    /// ID pendaftaran
+    #[schema(example = 1)]
     id: i32,
+    
+    /// ID sekolah
+    #[schema(example = 1)]
     school_id: i32,
+    
+    /// ID user
+    #[schema(example = 1)]
     user_id: i32,
+    
+    /// ID periode
+    #[schema(example = 1)]
     period_id: i32,
+    
+    /// ID jalur
+    #[schema(example = 1)]
     path_id: i32,
+    
+    /// Nomor pendaftaran
+    #[schema(example = "PPDB-2024-001")]
     registration_number: Option<String>,
+    
+    /// NISN siswa
+    #[schema(example = "0012345678")]
     student_nisn: String,
+    
+    /// Nama siswa
+    #[schema(example = "Ahmad Fauzi")]
     student_name: String,
+    
+    /// Jenis kelamin
+    #[schema(example = "L")]
     student_gender: String,
+    
+    /// Nama orang tua
+    #[schema(example = "Budi Santoso")]
     parent_name: String,
+    
+    /// Telepon orang tua
+    #[schema(example = "081234567890")]
     parent_phone: String,
+    
+    /// Status
+    #[schema(example = "submitted")]
     status: String,
+    
+    /// Alasan penolakan
+    #[schema(example = "Dokumen tidak lengkap")]
     rejection_reason: Option<String>,
+    
+    /// Waktu pembuatan
+    #[schema(value_type = String, example = "2024-01-01T00:00:00Z")]
     created_at: chrono::DateTime<chrono::Utc>,
+    
+    /// Waktu update
+    #[schema(value_type = String, example = "2024-01-01T00:00:00Z")]
     updated_at: chrono::DateTime<chrono::Utc>,
 }
 
@@ -113,30 +171,59 @@ impl From<crate::models::registration::Registration> for RegistrationResponse {
     }
 }
 
-#[derive(Debug, Serialize)]
-struct PendingVerificationsResponse {
+/// Response pending verifications
+#[derive(Debug, Serialize, ToSchema)]
+pub struct PendingVerificationsResponse {
+    /// Daftar pendaftaran
     registrations: Vec<RegistrationResponse>,
+    
+    /// Total data
+    #[schema(example = 50)]
     total: i64,
+    
+    /// Halaman saat ini
+    #[schema(example = 1)]
     page: i64,
+    
+    /// Jumlah item per halaman
+    #[schema(example = 10)]
     page_size: i64,
+    
+    /// Total halaman
+    #[schema(example = 5)]
     total_pages: i64,
 }
 
-#[derive(Debug, Serialize)]
-struct MessageResponse {
+/// Response pesan sukses
+#[derive(Debug, Serialize, ToSchema)]
+pub struct MessageResponse {
+    /// Pesan
+    #[schema(example = "Operation successful")]
     message: String,
 }
 
+/// Mendapatkan daftar pendaftaran yang menunggu verifikasi
+///
+/// Endpoint ini mengembalikan daftar pendaftaran yang perlu diverifikasi oleh admin sekolah.
+#[utoipa::path(
+    get,
+    path = "/api/verifications/pending",
+    tag = "Verifications",
+    params(PendingVerificationsQuery),
+    responses(
+        (status = 200, description = "Daftar pending verifications berhasil diambil", body = PendingVerificationsResponse),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 403, description = "Tidak memiliki akses")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn get_pending_verifications(
     State(state): State<AppState>,
-    req: Request,
+    Extension(auth_user): Extension<AuthUser>,
     Query(query): Query<PendingVerificationsQuery>,
 ) -> AppResult<Json<PendingVerificationsResponse>> {
-    // Get authenticated user
-    let auth_user = req
-        .extensions()
-        .get::<AuthUser>()
-        .ok_or_else(|| AppError::Authentication("Not authenticated".to_string()))?;
 
     let school_id = auth_user.school_id.ok_or_else(|| {
         AppError::Authentication("User must be associated with a school".to_string())
@@ -168,16 +255,28 @@ async fn get_pending_verifications(
     }))
 }
 
+/// Mendapatkan statistik verifikasi
+///
+/// Endpoint ini mengembalikan statistik verifikasi untuk sekolah.
+#[utoipa::path(
+    get,
+    path = "/api/verifications/stats",
+    tag = "Verifications",
+    params(StatsQuery),
+    responses(
+        (status = 200, description = "Statistik berhasil diambil", body = VerificationStats),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 403, description = "Tidak memiliki akses")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn get_verification_stats(
     State(state): State<AppState>,
-    req: Request,
+    Extension(auth_user): Extension<AuthUser>,
     Query(query): Query<StatsQuery>,
 ) -> AppResult<Json<VerificationStats>> {
-    // Get authenticated user
-    let auth_user = req
-        .extensions()
-        .get::<AuthUser>()
-        .ok_or_else(|| AppError::Authentication("Not authenticated".to_string()))?;
 
     let school_id = auth_user.school_id.ok_or_else(|| {
         AppError::Authentication("User must be associated with a school".to_string())
@@ -195,16 +294,31 @@ async fn get_verification_stats(
     Ok(Json(stats))
 }
 
+/// Verifikasi pendaftaran
+///
+/// Endpoint ini digunakan untuk memverifikasi pendaftaran yang sudah disubmit.
+#[utoipa::path(
+    post,
+    path = "/api/verifications/{id}/verify",
+    tag = "Verifications",
+    params(
+        ("id" = i32, Path, description = "ID pendaftaran")
+    ),
+    responses(
+        (status = 200, description = "Pendaftaran berhasil diverifikasi", body = RegistrationResponse),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 403, description = "Tidak memiliki akses"),
+        (status = 404, description = "Pendaftaran tidak ditemukan")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn verify_registration(
     State(state): State<AppState>,
-    req: Request,
+    Extension(auth_user): Extension<AuthUser>,
     Path(id): Path<i32>,
 ) -> AppResult<Json<RegistrationResponse>> {
-    // Get authenticated user
-    let auth_user = req
-        .extensions()
-        .get::<AuthUser>()
-        .ok_or_else(|| AppError::Authentication("Not authenticated".to_string()))?;
 
     // Create verification service
     let registration_repo = RegistrationRepository::new(state.db.clone());
@@ -218,22 +332,39 @@ async fn verify_registration(
     Ok(Json(verified_registration.into()))
 }
 
+/// Tolak pendaftaran
+///
+/// Endpoint ini digunakan untuk menolak pendaftaran dengan memberikan alasan.
+#[utoipa::path(
+    post,
+    path = "/api/verifications/{id}/reject",
+    tag = "Verifications",
+    params(
+        ("id" = i32, Path, description = "ID pendaftaran")
+    ),
+    request_body = RejectRegistrationRequest,
+    responses(
+        (status = 200, description = "Pendaftaran berhasil ditolak", body = RegistrationResponse),
+        (status = 400, description = "Request tidak valid"),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 403, description = "Tidak memiliki akses"),
+        (status = 404, description = "Pendaftaran tidak ditemukan")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn reject_registration(
     State(state): State<AppState>,
-    req: Request,
+    Extension(auth_user): Extension<AuthUser>,
     Path(id): Path<i32>,
     Json(payload): Json<RejectRegistrationRequest>,
 ) -> AppResult<Json<RegistrationResponse>> {
-    // Validate request
-    payload.validate().map_err(|e| {
-        AppError::Validation(format!("Validation error: {}", e))
-    })?;
+    // Validate reason length
+    if payload.reason.len() < 10 {
+        return Err(AppError::Validation("Reason must be at least 10 characters".to_string()));
+    }
 
-    // Get authenticated user
-    let auth_user = req
-        .extensions()
-        .get::<AuthUser>()
-        .ok_or_else(|| AppError::Authentication("Not authenticated".to_string()))?;
 
     // Create verification service
     let registration_repo = RegistrationRepository::new(state.db.clone());
@@ -247,22 +378,39 @@ async fn reject_registration(
     Ok(Json(rejected_registration.into()))
 }
 
+/// Verifikasi dokumen
+///
+/// Endpoint ini digunakan untuk memverifikasi atau menolak dokumen pendaftaran.
+#[utoipa::path(
+    post,
+    path = "/api/verifications/documents/{doc_id}/verify",
+    tag = "Verifications",
+    params(
+        ("doc_id" = i32, Path, description = "ID dokumen")
+    ),
+    request_body = VerifyDocumentRequest,
+    responses(
+        (status = 200, description = "Dokumen berhasil diverifikasi", body = MessageResponse),
+        (status = 400, description = "Request tidak valid"),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 403, description = "Tidak memiliki akses"),
+        (status = 404, description = "Dokumen tidak ditemukan")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn verify_document(
     State(state): State<AppState>,
-    req: Request,
+    Extension(auth_user): Extension<AuthUser>,
     Path(doc_id): Path<i32>,
     Json(payload): Json<VerifyDocumentRequest>,
 ) -> AppResult<Json<MessageResponse>> {
-    // Validate request
-    payload.validate().map_err(|e| {
-        AppError::Validation(format!("Validation error: {}", e))
-    })?;
+    // Validate verification status
+    if !["approved", "rejected"].contains(&payload.verification_status.as_str()) {
+        return Err(AppError::Validation("Invalid verification status".to_string()));
+    }
 
-    // Get authenticated user
-    let auth_user = req
-        .extensions()
-        .get::<AuthUser>()
-        .ok_or_else(|| AppError::Authentication("Not authenticated".to_string()))?;
 
     // Create verification service
     let registration_repo = RegistrationRepository::new(state.db.clone());

@@ -260,14 +260,38 @@ impl SelectionService {
     }
 }
 
-#[derive(Debug, serde::Serialize)]
+/// Statistik ranking per jalur pendaftaran
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
 pub struct PathRankingStats {
+    /// ID jalur
+    #[schema(example = 1)]
     pub path_id: i32,
+    
+    /// Nama jalur
+    #[schema(example = "Jalur Zonasi")]
     pub path_name: String,
+    
+    /// Tipe jalur
+    #[schema(example = "zonasi")]
     pub path_type: String,
+    
+    /// Kuota jalur
+    #[schema(example = 100)]
     pub quota: i32,
+    
+    /// Total pendaftaran
+    #[schema(example = 150)]
     pub total_registrations: i64,
+    
+    /// Skor tertinggi
+    #[schema(example = 95.5)]
     pub highest_score: Option<f64>,
+    
+    /// Skor terendah
+    #[schema(example = 65.0)]
     pub lowest_score: Option<f64>,
+    
+    /// Skor rata-rata
+    #[schema(example = 80.5)]
     pub average_score: Option<f64>,
 }

@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::NaiveDate;
 
 use crate::models::period::{Period, RegistrationPath};
 use crate::repositories::period_repo::PeriodRepository;
@@ -18,9 +18,9 @@ impl PeriodService {
         school_id: i32,
         academic_year: String,
         level: String,
-        start_date: DateTime<Utc>,
-        end_date: DateTime<Utc>,
-        reenrollment_deadline: Option<DateTime<Utc>>,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+        reenrollment_deadline: Option<NaiveDate>,
     ) -> AppResult<Period> {
         // Validate dates
         if end_date <= start_date {
@@ -105,10 +105,10 @@ impl PeriodService {
     pub async fn update_period(
         &self,
         id: i32,
-        start_date: Option<DateTime<Utc>>,
-        end_date: Option<DateTime<Utc>>,
-        announcement_date: Option<DateTime<Utc>>,
-        reenrollment_deadline: Option<DateTime<Utc>>,
+        start_date: Option<NaiveDate>,
+        end_date: Option<NaiveDate>,
+        announcement_date: Option<NaiveDate>,
+        reenrollment_deadline: Option<NaiveDate>,
     ) -> AppResult<Period> {
         // Check if period exists
         let period = self.get_period(id).await?;

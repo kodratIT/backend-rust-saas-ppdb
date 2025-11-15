@@ -29,19 +29,19 @@ INSERT INTO periods (school_id, academic_year, level, start_date, end_date, regi
 (3, '2025/2026', 'SD', '2025-07-01', '2026-06-30', '2025-01-01', '2025-02-28', '2025-03-15', '2025-04-01', 'active');
 
 -- Insert registration paths for each period
-INSERT INTO registration_paths (period_id, path_type, quota, description, scoring_config) VALUES
+INSERT INTO registration_paths (period_id, path_type, name, quota, description, scoring_config) VALUES
 -- SMA Negeri 1 Jakarta
-(1, 'zonasi', 100, 'Jalur Zonasi - berdasarkan jarak tempat tinggal', '{"max_distance_km": 5, "weight": 1.0}'),
-(1, 'prestasi', 50, 'Jalur Prestasi - berdasarkan nilai rapor dan prestasi', '{"rapor_weight": 0.6, "achievement_weight": 0.4}'),
-(1, 'afirmasi', 20, 'Jalur Afirmasi - untuk siswa kurang mampu', '{"criteria": "economic_status"}'),
-(1, 'perpindahan_tugas', 10, 'Jalur Perpindahan Tugas Orang Tua', '{"document_required": "surat_tugas"}'),
+(1, 'zonasi', 'Jalur Zonasi', 100, 'Jalur Zonasi - berdasarkan jarak tempat tinggal', '{"max_distance_km": 5, "weight": 1.0}'),
+(1, 'prestasi', 'Jalur Prestasi', 50, 'Jalur Prestasi - berdasarkan nilai rapor dan prestasi', '{"rapor_weight": 0.6, "achievement_weight": 0.4}'),
+(1, 'afirmasi', 'Jalur Afirmasi', 20, 'Jalur Afirmasi - untuk siswa kurang mampu', '{"criteria": "economic_status"}'),
+(1, 'perpindahan_tugas', 'Jalur Perpindahan Tugas Orang Tua', 10, 'Jalur Perpindahan Tugas Orang Tua', '{"document_required": "surat_tugas"}'),
 
 -- SMP Negeri 5 Bandung
-(2, 'zonasi', 80, 'Jalur Zonasi - berdasarkan jarak tempat tinggal', '{"max_distance_km": 3, "weight": 1.0}'),
-(2, 'prestasi', 40, 'Jalur Prestasi - berdasarkan nilai rapor dan prestasi', '{"rapor_weight": 0.7, "achievement_weight": 0.3}'),
-(2, 'afirmasi', 15, 'Jalur Afirmasi - untuk siswa kurang mampu', '{"criteria": "economic_status"}'),
+(2, 'zonasi', 'Jalur Zonasi', 80, 'Jalur Zonasi - berdasarkan jarak tempat tinggal', '{"max_distance_km": 3, "weight": 1.0}'),
+(2, 'prestasi', 'Jalur Prestasi', 40, 'Jalur Prestasi - berdasarkan nilai rapor dan prestasi', '{"rapor_weight": 0.7, "achievement_weight": 0.3}'),
+(2, 'afirmasi', 'Jalur Afirmasi', 15, 'Jalur Afirmasi - untuk siswa kurang mampu', '{"criteria": "economic_status"}'),
 
 -- SD Negeri 10 Surabaya
-(3, 'zonasi', 60, 'Jalur Zonasi - berdasarkan jarak tempat tinggal', '{"max_distance_km": 2, "weight": 1.0}'),
-(3, 'prestasi', 20, 'Jalur Prestasi - berdasarkan prestasi TK', '{"tk_report_weight": 1.0}'),
-(3, 'afirmasi', 10, 'Jalur Afirmasi - untuk siswa kurang mampu', '{"criteria": "economic_status"}');
+(3, 'zonasi', 'Jalur Zonasi', 60, 'Jalur Zonasi - berdasarkan jarak tempat tinggal', '{"max_distance_km": 2, "weight": 1.0}'),
+(3, 'prestasi', 'Jalur Prestasi', 20, 'Jalur Prestasi - berdasarkan prestasi TK', '{"tk_report_weight": 1.0}'),
+(3, 'afirmasi', 'Jalur Afirmasi', 10, 'Jalur Afirmasi - untuk siswa kurang mampu', '{"criteria": "economic_status"}');

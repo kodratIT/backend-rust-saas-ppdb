@@ -3,21 +3,22 @@ CREATE TABLE documents (
     id SERIAL PRIMARY KEY,
     registration_id INTEGER NOT NULL REFERENCES registrations(id) ON DELETE CASCADE,
     document_type VARCHAR(50) NOT NULL CHECK (document_type IN (
-        'kartu_keluarga', 'akta_kelahiran', 'rapor', 
-        'sertifikat_prestasi', 'surat_keterangan', 'other'
+        'kartu_keluarga', 'akta_kelahiran', 'birth_certificate', 'family_card',
+        'ijazah', 'rapor', 'sertifikat_prestasi', 'surat_keterangan_pindah',
+        'surat_keterangan_afirmasi', 'foto', 'other'
     )),
     file_url TEXT NOT NULL,
     file_name VARCHAR(255) NOT NULL,
-    file_size INTEGER,
+    file_size BIGINT,
     mime_type VARCHAR(100),
     verification_status VARCHAR(20) DEFAULT 'pending' CHECK (verification_status IN (
         'pending', 'approved', 'rejected'
     )),
-    rejection_reason TEXT,
+    verification_notes TEXT,
     verified_by INTEGER REFERENCES users(id),
-    verified_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    verified_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create indexes

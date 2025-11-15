@@ -1,13 +1,13 @@
 use axum::{
-    extract::{Path, Query, Request, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     middleware,
     routing::{delete, get, post, put},
-    Json, Router,
+    Extension, Json, Router,
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
-use validator::Validate;
+use utoipa::ToSchema;
 
 use crate::api::middleware::auth::{auth_middleware, AuthUser};
 use crate::api::middleware::rbac::require_school_admin;
@@ -29,80 +29,121 @@ pub fn routes(state: AppState) -> Router<AppState> {
         .route_layer(middleware::from_fn_with_state(state.clone(), auth_middleware))
 }
 
-#[derive(Debug, Deserialize, Validate)]
-struct CreatePeriodRequest {
-    #[validate(length(min = 9, max = 9))]
-    academic_year: String, // e.g., "2024/2025"
+/// Request untuk membuat periode PPDB baru
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CreatePeriodRequest {
+    /// Tahun ajaran (format: YYYY/YYYY, contoh: "2024/2025")
+    #[schema(example = "2024/2025")]
+    academic_year: String,
     
-    #[validate(custom = "validate_level")]
+    /// Jenjang pendidikan (SD/SMP/SMA/SMK)
+    #[schema(example = "SMA")]
     level: String,
     
-    start_date: DateTime<Utc>,
-    end_date: DateTime<Utc>,
-    reenrollment_deadline: Option<DateTime<Utc>>,
+    /// Tanggal mulai periode
+    #[schema(value_type = String, example = "2024-06-01")]
+    start_date: NaiveDate,
     
+    /// Tanggal akhir periode
+    #[schema(value_type = String, example = "2024-07-31")]
+    end_date: NaiveDate,
+    
+    /// Batas waktu daftar ulang (opsional)
+    #[schema(value_type = Option<String>, example = "2024-08-15")]
+    reenrollment_deadline: Option<NaiveDate>,
+    
+    /// Daftar jalur pendaftaran
     paths: Vec<CreatePathRequest>,
 }
 
-fn validate_level(level: &str) -> Result<(), validator::ValidationError> {
-    match level.to_uppercase().as_str() {
-        "SD" | "SMP" | "SMA" | "SMK" => Ok(()),
-        _ => Err(validator::ValidationError::new("invalid_level")),
-    }
-}
-
-#[derive(Debug, Deserialize, Validate)]
-struct CreatePathRequest {
-    #[validate(custom = "validate_path_type")]
+/// Request untuk membuat jalur pendaftaran
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CreatePathRequest {
+    /// Tipe jalur (zonasi/prestasi/afirmasi/perpindahan_tugas)
+    #[schema(example = "zonasi")]
     path_type: String,
     
-    #[validate(length(min = 3))]
+    /// Nama jalur
+    #[schema(example = "Jalur Zonasi")]
     name: String,
     
-    #[validate(range(min = 1))]
+    /// Kuota peserta
+    #[schema(example = 100)]
     quota: i32,
     
+    /// Deskripsi jalur (opsional)
+    #[schema(example = "Jalur untuk siswa dalam zona sekolah")]
     description: Option<String>,
+    
+    /// Konfigurasi penilaian dalam format JSON
+    #[schema(value_type = Object)]
     scoring_config: serde_json::Value,
 }
 
-fn validate_path_type(path_type: &str) -> Result<(), validator::ValidationError> {
-    match path_type {
-        "zonasi" | "prestasi" | "afirmasi" | "perpindahan_tugas" => Ok(()),
-        _ => Err(validator::ValidationError::new("invalid_path_type")),
-    }
+/// Request untuk update periode PPDB
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdatePeriodRequest {
+    /// Tanggal mulai periode (opsional)
+    #[schema(value_type = Option<String>, example = "2024-06-01")]
+    start_date: Option<NaiveDate>,
+    
+    /// Tanggal akhir periode (opsional)
+    #[schema(value_type = Option<String>, example = "2024-07-31")]
+    end_date: Option<NaiveDate>,
+    
+    /// Tanggal pengumuman (opsional)
+    #[schema(value_type = Option<String>, example = "2024-08-01")]
+    announcement_date: Option<NaiveDate>,
+    
+    /// Batas waktu daftar ulang (opsional)
+    #[schema(value_type = Option<String>, example = "2024-08-15")]
+    reenrollment_deadline: Option<NaiveDate>,
 }
 
-#[derive(Debug, Deserialize, Validate)]
-struct UpdatePeriodRequest {
-    start_date: Option<DateTime<Utc>>,
-    end_date: Option<DateTime<Utc>>,
-    announcement_date: Option<DateTime<Utc>>,
-    reenrollment_deadline: Option<DateTime<Utc>>,
-}
-
-#[derive(Debug, Deserialize, Validate)]
-struct UpdatePathRequest {
-    #[validate(length(min = 3))]
+/// Request untuk update jalur pendaftaran
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdatePathRequest {
+    /// Nama jalur (opsional)
+    #[schema(example = "Jalur Zonasi")]
     name: Option<String>,
     
-    #[validate(range(min = 1))]
+    /// Kuota peserta (opsional)
+    #[schema(example = 120)]
     quota: Option<i32>,
     
+    /// Deskripsi jalur (opsional)
+    #[schema(example = "Jalur untuk siswa dalam zona sekolah")]
     description: Option<String>,
+    
+    /// Konfigurasi penilaian dalam format JSON (opsional)
+    #[schema(value_type = Option<Object>)]
     scoring_config: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Deserialize)]
-struct ListPeriodsQuery {
+/// Query parameters untuk list periode
+#[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct ListPeriodsQuery {
+    /// Nomor halaman
     #[serde(default = "default_page")]
+    #[schema(example = 1)]
     page: i64,
     
+    /// Jumlah item per halaman
     #[serde(default = "default_page_size")]
+    #[schema(example = 10)]
     page_size: i64,
     
+    /// Filter berdasarkan status (draft/active/closed)
+    #[schema(example = "active")]
     status: Option<String>,
+    
+    /// Filter berdasarkan tahun ajaran
+    #[schema(example = "2024/2025")]
     academic_year: Option<String>,
+    
+    /// Filter berdasarkan jenjang
+    #[schema(example = "SMA")]
     level: Option<String>,
 }
 
@@ -114,18 +155,59 @@ fn default_page_size() -> i64 {
     10
 }
 
-#[derive(Debug, Serialize)]
-struct PeriodResponse {
+/// Response data periode PPDB
+#[derive(Debug, Serialize, ToSchema)]
+pub struct PeriodResponse {
+    /// ID periode
+    #[schema(example = 1)]
     id: i32,
+    
+    /// ID sekolah
+    #[schema(example = 1)]
     school_id: i32,
+    
+    /// Tahun ajaran
+    #[schema(example = "2024/2025")]
     academic_year: String,
+    
+    /// Jenjang pendidikan
+    #[schema(example = "SMA")]
     level: String,
-    start_date: DateTime<Utc>,
-    end_date: DateTime<Utc>,
-    announcement_date: Option<DateTime<Utc>>,
-    reenrollment_deadline: Option<DateTime<Utc>>,
+    
+    /// Tanggal mulai periode
+    #[schema(value_type = String, example = "2024-06-01")]
+    start_date: NaiveDate,
+    
+    /// Tanggal akhir periode
+    #[schema(value_type = String, example = "2024-07-31")]
+    end_date: NaiveDate,
+    
+    /// Tanggal mulai pendaftaran
+    #[schema(value_type = String, example = "2024-06-01")]
+    registration_start: NaiveDate,
+    
+    /// Tanggal akhir pendaftaran
+    #[schema(value_type = String, example = "2024-06-30")]
+    registration_end: NaiveDate,
+    
+    /// Tanggal pengumuman
+    #[schema(value_type = Option<String>, example = "2024-08-01")]
+    announcement_date: Option<NaiveDate>,
+    
+    /// Batas waktu daftar ulang
+    #[schema(value_type = Option<String>, example = "2024-08-15")]
+    reenrollment_deadline: Option<NaiveDate>,
+    
+    /// Status periode (draft/active/closed)
+    #[schema(example = "active")]
     status: String,
+    
+    /// Waktu pembuatan
+    #[schema(value_type = String, example = "2024-01-01T00:00:00Z")]
     created_at: DateTime<Utc>,
+    
+    /// Waktu update terakhir
+    #[schema(value_type = String, example = "2024-01-01T00:00:00Z")]
     updated_at: DateTime<Utc>,
 }
 
@@ -138,6 +220,8 @@ impl From<Period> for PeriodResponse {
             level: period.level,
             start_date: period.start_date,
             end_date: period.end_date,
+            registration_start: period.registration_start,
+            registration_end: period.registration_end,
             announcement_date: period.announcement_date,
             reenrollment_deadline: period.reenrollment_deadline,
             status: period.status,
@@ -147,23 +231,53 @@ impl From<Period> for PeriodResponse {
     }
 }
 
-#[derive(Debug, Serialize)]
-struct PeriodWithPathsResponse {
-    #[serde(flatten)]
+/// Response periode dengan jalur pendaftaran
+#[derive(Debug, Serialize, ToSchema)]
+pub struct PeriodWithPathsResponse {
+    /// Data periode
     period: PeriodResponse,
+    
+    /// Daftar jalur pendaftaran
     paths: Vec<PathResponse>,
 }
 
-#[derive(Debug, Serialize)]
-struct PathResponse {
+/// Response data jalur pendaftaran
+#[derive(Debug, Serialize, ToSchema)]
+pub struct PathResponse {
+    /// ID jalur
+    #[schema(example = 1)]
     id: i32,
+    
+    /// ID periode
+    #[schema(example = 1)]
     period_id: i32,
+    
+    /// Tipe jalur
+    #[schema(example = "zonasi")]
     path_type: String,
+    
+    /// Nama jalur
+    #[schema(example = "Jalur Zonasi")]
     name: String,
+    
+    /// Kuota peserta
+    #[schema(example = 100)]
     quota: i32,
+    
+    /// Deskripsi jalur
+    #[schema(example = "Jalur untuk siswa dalam zona sekolah")]
     description: Option<String>,
+    
+    /// Konfigurasi penilaian
+    #[schema(value_type = Object)]
     scoring_config: serde_json::Value,
+    
+    /// Waktu pembuatan
+    #[schema(value_type = String, example = "2024-01-01T00:00:00Z")]
     created_at: DateTime<Utc>,
+    
+    /// Waktu update terakhir
+    #[schema(value_type = String, example = "2024-01-01T00:00:00Z")]
     updated_at: DateTime<Utc>,
 }
 
@@ -183,36 +297,71 @@ impl From<RegistrationPath> for PathResponse {
     }
 }
 
-#[derive(Debug, Serialize)]
-struct ListPeriodsResponse {
+/// Response list periode dengan pagination
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ListPeriodsResponse {
+    /// Daftar periode
     periods: Vec<PeriodResponse>,
+    
+    /// Total data
+    #[schema(example = 50)]
     total: i64,
+    
+    /// Halaman saat ini
+    #[schema(example = 1)]
     page: i64,
+    
+    /// Jumlah item per halaman
+    #[schema(example = 10)]
     page_size: i64,
+    
+    /// Total halaman
+    #[schema(example = 5)]
     total_pages: i64,
 }
 
-#[derive(Debug, Serialize)]
-struct MessageResponse {
+/// Response pesan sukses
+#[derive(Debug, Serialize, ToSchema)]
+pub struct MessageResponse {
+    /// Pesan
+    #[schema(example = "Operation successful")]
     message: String,
 }
 
+/// Membuat periode PPDB baru
+///
+/// Endpoint ini digunakan untuk membuat periode PPDB baru beserta jalur pendaftarannya.
+/// Hanya dapat diakses oleh admin sekolah.
+#[utoipa::path(
+    post,
+    path = "/api/periods",
+    tag = "Periods",
+    request_body = CreatePeriodRequest,
+    responses(
+        (status = 201, description = "Periode berhasil dibuat", body = PeriodWithPathsResponse),
+        (status = 400, description = "Request tidak valid"),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 403, description = "Tidak memiliki akses")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn create_period(
     State(state): State<AppState>,
-    req: Request,
+    Extension(auth_user): Extension<AuthUser>,
     Json(payload): Json<CreatePeriodRequest>,
 ) -> AppResult<(StatusCode, Json<PeriodWithPathsResponse>)> {
-    // Validate request
-    payload.validate().map_err(|e| {
-        AppError::Validation(format!("Validation error: {}", e))
-    })?;
-
-    // Get authenticated user
-    let auth_user = req
-        .extensions()
-        .get::<AuthUser>()
-        .ok_or_else(|| AppError::Authentication("Not authenticated".to_string()))?;
-
+    // Validate academic year format
+    if payload.academic_year.len() != 9 {
+        return Err(AppError::Validation("Academic year must be in format YYYY/YYYY".to_string()));
+    }
+    
+    // Validate level
+    if !["SD", "SMP", "SMA", "SMK"].contains(&payload.level.to_uppercase().as_str()) {
+        return Err(AppError::Validation("Invalid level".to_string()));
+    }
+    
     let school_id = auth_user.school_id.ok_or_else(|| {
         AppError::Authentication("User must be associated with a school".to_string())
     })?;
@@ -258,17 +407,28 @@ async fn create_period(
     ))
 }
 
+/// Mendapatkan daftar periode PPDB
+///
+/// Endpoint ini mengembalikan daftar periode PPDB dengan pagination dan filter.
+#[utoipa::path(
+    get,
+    path = "/api/periods",
+    tag = "Periods",
+    params(ListPeriodsQuery),
+    responses(
+        (status = 200, description = "Daftar periode berhasil diambil", body = ListPeriodsResponse),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 403, description = "Tidak memiliki akses")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn list_periods(
     State(state): State<AppState>,
-    req: Request,
+    Extension(auth_user): Extension<AuthUser>,
     Query(query): Query<ListPeriodsQuery>,
 ) -> AppResult<Json<ListPeriodsResponse>> {
-    // Get authenticated user
-    let auth_user = req
-        .extensions()
-        .get::<AuthUser>()
-        .ok_or_else(|| AppError::Authentication("Not authenticated".to_string()))?;
-
     let school_id = auth_user.school_id.ok_or_else(|| {
         AppError::Authentication("User must be associated with a school".to_string())
     })?;
@@ -300,6 +460,25 @@ async fn list_periods(
     }))
 }
 
+/// Mendapatkan detail periode PPDB
+///
+/// Endpoint ini mengembalikan detail periode beserta jalur pendaftarannya.
+#[utoipa::path(
+    get,
+    path = "/api/periods/{id}",
+    tag = "Periods",
+    params(
+        ("id" = i32, Path, description = "ID periode")
+    ),
+    responses(
+        (status = 200, description = "Detail periode berhasil diambil", body = PeriodWithPathsResponse),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 404, description = "Periode tidak ditemukan")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn get_period(
     State(state): State<AppState>,
     Path(id): Path<i32>,
@@ -317,15 +496,33 @@ async fn get_period(
     }))
 }
 
+/// Update periode PPDB
+///
+/// Endpoint ini digunakan untuk mengupdate informasi periode PPDB.
+#[utoipa::path(
+    put,
+    path = "/api/periods/{id}",
+    tag = "Periods",
+    params(
+        ("id" = i32, Path, description = "ID periode")
+    ),
+    request_body = UpdatePeriodRequest,
+    responses(
+        (status = 200, description = "Periode berhasil diupdate", body = PeriodResponse),
+        (status = 400, description = "Request tidak valid"),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 403, description = "Tidak memiliki akses"),
+        (status = 404, description = "Periode tidak ditemukan")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn update_period(
     State(state): State<AppState>,
     Path(id): Path<i32>,
     Json(payload): Json<UpdatePeriodRequest>,
 ) -> AppResult<Json<PeriodResponse>> {
-    // Validate request
-    payload.validate().map_err(|e| {
-        AppError::Validation(format!("Validation error: {}", e))
-    })?;
 
     // Create period service
     let period_repo = PeriodRepository::new(state.db.clone());
@@ -345,6 +542,26 @@ async fn update_period(
     Ok(Json(period.into()))
 }
 
+/// Hapus periode PPDB
+///
+/// Endpoint ini digunakan untuk menghapus periode PPDB.
+#[utoipa::path(
+    delete,
+    path = "/api/periods/{id}",
+    tag = "Periods",
+    params(
+        ("id" = i32, Path, description = "ID periode")
+    ),
+    responses(
+        (status = 200, description = "Periode berhasil dihapus", body = MessageResponse),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 403, description = "Tidak memiliki akses"),
+        (status = 404, description = "Periode tidak ditemukan")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn delete_period(
     State(state): State<AppState>,
     Path(id): Path<i32>,
@@ -361,6 +578,26 @@ async fn delete_period(
     }))
 }
 
+/// Aktifkan periode PPDB
+///
+/// Endpoint ini digunakan untuk mengaktifkan periode PPDB.
+#[utoipa::path(
+    post,
+    path = "/api/periods/{id}/activate",
+    tag = "Periods",
+    params(
+        ("id" = i32, Path, description = "ID periode")
+    ),
+    responses(
+        (status = 200, description = "Periode berhasil diaktifkan", body = PeriodResponse),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 403, description = "Tidak memiliki akses"),
+        (status = 404, description = "Periode tidak ditemukan")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn activate_period(
     State(state): State<AppState>,
     Path(id): Path<i32>,
@@ -375,6 +612,26 @@ async fn activate_period(
     Ok(Json(period.into()))
 }
 
+/// Tutup periode PPDB
+///
+/// Endpoint ini digunakan untuk menutup periode PPDB.
+#[utoipa::path(
+    post,
+    path = "/api/periods/{id}/close",
+    tag = "Periods",
+    params(
+        ("id" = i32, Path, description = "ID periode")
+    ),
+    responses(
+        (status = 200, description = "Periode berhasil ditutup", body = PeriodResponse),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 403, description = "Tidak memiliki akses"),
+        (status = 404, description = "Periode tidak ditemukan")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn close_period(
     State(state): State<AppState>,
     Path(id): Path<i32>,
@@ -389,6 +646,25 @@ async fn close_period(
     Ok(Json(period.into()))
 }
 
+/// Mendapatkan daftar jalur pendaftaran
+///
+/// Endpoint ini mengembalikan daftar jalur pendaftaran untuk periode tertentu.
+#[utoipa::path(
+    get,
+    path = "/api/periods/{period_id}/paths",
+    tag = "Periods",
+    params(
+        ("period_id" = i32, Path, description = "ID periode")
+    ),
+    responses(
+        (status = 200, description = "Daftar jalur berhasil diambil", body = Vec<PathResponse>),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 404, description = "Periode tidak ditemukan")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn get_paths(
     State(state): State<AppState>,
     Path(period_id): Path<i32>,
@@ -403,15 +679,37 @@ async fn get_paths(
     Ok(Json(paths.into_iter().map(|p| p.into()).collect()))
 }
 
+/// Membuat jalur pendaftaran baru
+///
+/// Endpoint ini digunakan untuk menambahkan jalur pendaftaran ke periode PPDB.
+#[utoipa::path(
+    post,
+    path = "/api/periods/{period_id}/paths",
+    tag = "Periods",
+    params(
+        ("period_id" = i32, Path, description = "ID periode")
+    ),
+    request_body = CreatePathRequest,
+    responses(
+        (status = 201, description = "Jalur berhasil dibuat", body = PathResponse),
+        (status = 400, description = "Request tidak valid"),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 403, description = "Tidak memiliki akses"),
+        (status = 404, description = "Periode tidak ditemukan")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn create_path(
     State(state): State<AppState>,
     Path(period_id): Path<i32>,
     Json(payload): Json<CreatePathRequest>,
 ) -> AppResult<(StatusCode, Json<PathResponse>)> {
-    // Validate request
-    payload.validate().map_err(|e| {
-        AppError::Validation(format!("Validation error: {}", e))
-    })?;
+    // Validate path type
+    if !["zonasi", "prestasi", "afirmasi", "perpindahan_tugas"].contains(&payload.path_type.as_str()) {
+        return Err(AppError::Validation("Invalid path type".to_string()));
+    }
 
     // Create period service
     let period_repo = PeriodRepository::new(state.db.clone());
@@ -432,15 +730,33 @@ async fn create_path(
     Ok((StatusCode::CREATED, Json(path.into())))
 }
 
+/// Update jalur pendaftaran
+///
+/// Endpoint ini digunakan untuk mengupdate informasi jalur pendaftaran.
+#[utoipa::path(
+    put,
+    path = "/api/periods/paths/{path_id}",
+    tag = "Periods",
+    params(
+        ("path_id" = i32, Path, description = "ID jalur pendaftaran")
+    ),
+    request_body = UpdatePathRequest,
+    responses(
+        (status = 200, description = "Jalur berhasil diupdate", body = PathResponse),
+        (status = 400, description = "Request tidak valid"),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 403, description = "Tidak memiliki akses"),
+        (status = 404, description = "Jalur tidak ditemukan")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn update_path(
     State(state): State<AppState>,
     Path(path_id): Path<i32>,
     Json(payload): Json<UpdatePathRequest>,
 ) -> AppResult<Json<PathResponse>> {
-    // Validate request
-    payload.validate().map_err(|e| {
-        AppError::Validation(format!("Validation error: {}", e))
-    })?;
 
     // Create period service
     let period_repo = PeriodRepository::new(state.db.clone());
@@ -460,6 +776,26 @@ async fn update_path(
     Ok(Json(path.into()))
 }
 
+/// Hapus jalur pendaftaran
+///
+/// Endpoint ini digunakan untuk menghapus jalur pendaftaran.
+#[utoipa::path(
+    delete,
+    path = "/api/periods/paths/{path_id}",
+    tag = "Periods",
+    params(
+        ("path_id" = i32, Path, description = "ID jalur pendaftaran")
+    ),
+    responses(
+        (status = 200, description = "Jalur berhasil dihapus", body = MessageResponse),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 403, description = "Tidak memiliki akses"),
+        (status = 404, description = "Jalur tidak ditemukan")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn delete_path(
     State(state): State<AppState>,
     Path(path_id): Path<i32>,

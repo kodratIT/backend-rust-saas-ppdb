@@ -1,0 +1,261 @@
+mod test_helpers;
+
+use reqwest::StatusCode;
+use serde_json::json;
+use test_helpers::{parse_json, TestContext};
+
+#[tokio::test]
+async fn test_user_list() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+    let school_id = ctx.create_test_school(&super_admin.access_token, "TEST100").await;
+    
+    // Create some users
+    ctx.create_school_admin(school_id, "admin1@test.com").await;
+    ctx.create_parent(school_id, "parent1@test.com").await;
+
+    let response = ctx
+        .client
+        .get(&format!("{}/users?page=1&page_size=10", ctx.base_url))
+        .bearer_auth(&super_admin.access_token)
+        .send()
+        .await
+        .expect("Failed to list users");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    let result: serde_json::Value = parse_json(response).await;
+    assert!(result["users"].as_array().unwrap().len() >= 2);
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_user_list_filter_by_role() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+    let school_id = ctx.create_test_school(&super_admin.access_token, "TEST101").await;
+    
+    ctx.create_parent(school_id, "parent2@test.com").await;
+    ctx.create_parent(school_id, "parent3@test.com").await;
+
+    let response = ctx
+        .client
+        .get(&format!("{}/users?role=parent", ctx.base_url))
+        .bearer_auth(&super_admin.access_token)
+        .send()
+        .await
+        .expect("Failed to list users");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    let result: serde_json::Value = parse_json(response).await;
+    let users = result["users"].as_array().unwrap();
+    assert!(users.iter().all(|u| u["role"] == "parent"));
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_user_get_by_id() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+    let school_id = ctx.create_test_school(&super_admin.access_token, "TEST102").await;
+    let parent = ctx.create_parent(school_id, "parent4@test.com").await;
+
+    let response = ctx
+        .client
+        .get(&format!("{}/users/{}", ctx.base_url, parent.id))
+        .bearer_auth(&super_admin.access_token)
+        .send()
+        .await
+        .expect("Failed to get user");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    let user: serde_json::Value = parse_json(response).await;
+    assert_eq!(user["id"], parent.id);
+    assert_eq!(user["email"], parent.email);
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_user_get_current_user_full() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+
+    let response = ctx
+        .client
+        .get(&format!("{}/users/me", ctx.base_url))
+        .bearer_auth(&super_admin.access_token)
+        .send()
+        .await
+        .expect("Failed to get current user");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    let user: serde_json::Value = parse_json(response).await;
+    assert_eq!(user["email"], super_admin.email);
+    assert_eq!(user["role"], "super_admin");
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_user_update_current_user() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+
+    let response = ctx
+        .client
+        .put(&format!("{}/users/me", ctx.base_url))
+        .bearer_auth(&super_admin.access_token)
+        .json(&json!({
+            "full_name": "Updated Admin Name",
+            "phone": "089999999999"
+        }))
+        .send()
+        .await
+        .expect("Failed to update user");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    let user: serde_json::Value = parse_json(response).await;
+    assert_eq!(user["full_name"], "Updated Admin Name");
+    assert_eq!(user["phone"], "089999999999");
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_user_change_password_success() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+
+    let response = ctx
+        .client
+        .post(&format!("{}/users/me/change-password", ctx.base_url))
+        .bearer_auth(&super_admin.access_token)
+        .json(&json!({
+            "old_password": "password123",
+            "new_password": "newpassword123"
+        }))
+        .send()
+        .await
+        .expect("Failed to change password");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    // Try login with new password
+    let login_response = ctx
+        .client
+        .post(&format!("{}/auth/login", ctx.base_url))
+        .json(&json!({
+            "email": super_admin.email,
+            "password": "newpassword123"
+        }))
+        .send()
+        .await
+        .expect("Failed to login with new password");
+
+    assert_eq!(login_response.status(), StatusCode::OK);
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_user_change_password_wrong_old_password() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+
+    let response = ctx
+        .client
+        .post(&format!("{}/users/me/change-password", ctx.base_url))
+        .bearer_auth(&super_admin.access_token)
+        .json(&json!({
+            "old_password": "wrongpassword",
+            "new_password": "newpassword123"
+        }))
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_user_change_password_too_short() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+
+    let response = ctx
+        .client
+        .post(&format!("{}/users/me/change-password", ctx.base_url))
+        .bearer_auth(&super_admin.access_token)
+        .json(&json!({
+            "old_password": "password123",
+            "new_password": "short"
+        }))
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_user_school_admin_can_only_see_own_school_users() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+    let school_id_1 = ctx.create_test_school(&super_admin.access_token, "TEST110").await;
+    let school_id_2 = ctx.create_test_school(&super_admin.access_token, "TEST111").await;
+    
+    let school_admin_1 = ctx.create_school_admin(school_id_1, "admin1@test.com").await;
+    
+    // Create users in both schools
+    ctx.create_parent(school_id_1, "parent_school1@test.com").await;
+    ctx.create_parent(school_id_2, "parent_school2@test.com").await;
+
+    let response = ctx
+        .client
+        .get(&format!("{}/users", ctx.base_url))
+        .bearer_auth(&school_admin_1.access_token)
+        .send()
+        .await
+        .expect("Failed to list users");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    let result: serde_json::Value = parse_json(response).await;
+    let users = result["users"].as_array().unwrap();
+    
+    // Should only see users from school 1
+    assert!(users.iter().all(|u| {
+        u["school_id"].is_null() || u["school_id"] == school_id_1
+    }));
+
+    ctx.cleanup_test_data().await;
+}

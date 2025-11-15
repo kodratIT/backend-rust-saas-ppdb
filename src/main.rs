@@ -3,23 +3,13 @@ use sqlx::postgres::PgPoolOptions;
 use std::net::SocketAddr;
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
+use utoipa_rapidoc::RapiDoc;
+use utoipa_redoc::{Redoc, Servable};
 
-mod api;
-mod config;
-mod dto;
-mod integrations;
-mod models;
-mod repositories;
-mod services;
-mod utils;
-
-use config::Config;
-
-#[derive(Clone)]
-pub struct AppState {
-    pub db: sqlx::PgPool,
-    pub config: Config,
-}
+use ppdb_backend::{api, AppState, Config};
+use ppdb_backend::api::docs::ApiDoc;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -36,16 +26,26 @@ async fn main() -> anyhow::Result<()> {
     let config = Config::from_env()?;
     tracing::info!("Configuration loaded successfully");
 
-    // Database connection pool
+    // Database connection pool with aggressive prepared statement fixes
+    // This fixes "prepared statement already exists" error
     let db_pool = PgPoolOptions::new()
-        .max_connections(20)
-        .connect(&config.database_url)
+        .max_connections(1)  // Single connection to avoid statement conflicts
+        .max_lifetime(std::time::Duration::from_secs(30))  // Short connection lifetime
+        .idle_timeout(std::time::Duration::from_secs(10))  // Quick connection release
+        .connect_with(
+            config.database_url
+                .parse::<sqlx::postgres::PgConnectOptions>()?
+                .statement_cache_capacity(0)  // Disable statement caching
+        )
         .await?;
-    tracing::info!("Database connection pool established");
+    tracing::info!("Database connection pool established (single connection, no cache)");
 
     // Run migrations
-    sqlx::migrate!("./migrations").run(&db_pool).await?;
-    tracing::info!("Database migrations completed");
+    // Note: Temporarily disabled due to prepared statement conflicts
+    // Run manually: sqlx migrate run
+    // Or use alternative migration method
+    // sqlx::migrate!("./migrations").run(&db_pool).await?;
+    // tracing::info!("Database migrations completed");
 
     // Build application state
     let app_state = AppState {
@@ -58,8 +58,13 @@ async fn main() -> anyhow::Result<()> {
         .route("/", get(root))
         .route("/health", get(health_check))
         .nest("/api/v1", api::routes(app_state.clone()))
-        .layer(CorsLayer::permissive())
-        .with_state(app_state);
+        // API Documentation routes
+        .merge(SwaggerUi::new("/api/docs/swagger")
+            .url("/api/docs/openapi.json", ApiDoc::openapi()))
+        .merge(RapiDoc::new("/api/docs/openapi.json")
+            .path("/api/docs/rapidoc"))
+        .merge(Redoc::with_url("/api/docs/redoc", ApiDoc::openapi()))
+        .layer(CorsLayer::permissive());
 
     // Start server
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));

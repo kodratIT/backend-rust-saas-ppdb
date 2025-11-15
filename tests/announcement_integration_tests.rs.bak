@@ -1,0 +1,350 @@
+mod test_helpers;
+
+use chrono::{Duration, Utc};
+use reqwest::StatusCode;
+use serde_json::json;
+use test_helpers::{parse_json, TestContext};
+
+async fn setup_complete_selection_flow(
+    ctx: &TestContext,
+    school_admin_token: &str,
+    parent_token: &str,
+    count: usize,
+) -> (i64, Vec<String>) {
+    let start_date = Utc::now();
+    let end_date = start_date + Duration::days(90);
+
+    // Create period
+    let period_response = ctx
+        .client
+        .post(&format!("{}/periods", ctx.base_url))
+        .bearer_auth(school_admin_token)
+        .json(&json!({
+            "academic_year": "2024/2025",
+            "level": "SMA",
+            "start_date": start_date.to_rfc3339(),
+            "end_date": end_date.to_rfc3339(),
+            "paths": [
+                {
+                    "path_type": "zonasi",
+                    "name": "Jalur Zonasi",
+                    "quota": 3,
+                    "scoring_config": {
+                        "distance_weight": 100
+                    }
+                }
+            ]
+        }))
+        .send()
+        .await
+        .expect("Failed to create period");
+
+    let period_data: serde_json::Value = parse_json(period_response).await;
+    let period_id = period_data["period"]["id"].as_i64().unwrap();
+    let path_id = period_data["paths"][0]["id"].as_i64().unwrap();
+
+    // Activate period
+    ctx.client
+        .post(&format!("{}/periods/{}/activate", ctx.base_url, period_id))
+        .bearer_auth(school_admin_token)
+        .send()
+        .await
+        .expect("Failed to activate period");
+
+    let mut registration_numbers = Vec::new();
+
+    // Create, submit, and verify registrations
+    for i in 0..count {
+        let birth_date = Utc::now() - Duration::days(365 * 15);
+        let nisn = format!("200000000{}", i);
+        
+        let reg_response = ctx
+            .client
+            .post(&format!("{}/registrations", ctx.base_url))
+            .bearer_auth(parent_token)
+            .json(&json!({
+                "period_id": period_id,
+                "path_id": path_id,
+                "student_nisn": nisn,
+                "student_name": format!("Student Announce {}", i),
+                "student_gender": "L",
+                "student_birth_place": "Jakarta",
+                "student_birth_date": birth_date.to_rfc3339(),
+                "student_religion": "Islam",
+                "student_address": "Jl. Announcement Test",
+                "student_email": format!("announce{}@test.com", i),
+                "parent_name": "Parent Announce",
+                "parent_nik": format!("200000000000000{}", i),
+                "parent_phone": format!("0820000000{:02}", i),
+                "path_data": {
+                    "distance_km": (i as f64 * 0.5) + 1.0
+                }
+            }))
+            .send()
+            .await
+            .expect("Failed to create registration");
+
+        let reg_data: serde_json::Value = parse_json(reg_response).await;
+        let registration_id = reg_data["id"].as_i64().unwrap();
+
+        // Submit
+        let submit_response = ctx
+            .client
+            .post(&format!("{}/registrations/{}/submit", ctx.base_url, registration_id))
+            .bearer_auth(parent_token)
+            .send()
+            .await
+            .expect("Failed to submit registration");
+        
+        let submitted: serde_json::Value = parse_json(submit_response).await;
+        registration_numbers.push(submitted["registration_number"].as_str().unwrap().to_string());
+
+        // Verify
+        ctx.client
+            .post(&format!("{}/verifications/{}/verify", ctx.base_url, registration_id))
+            .bearer_auth(school_admin_token)
+            .send()
+            .await
+            .expect("Failed to verify registration");
+    }
+
+    // Calculate scores and rankings
+    ctx.client
+        .post(&format!("{}/selection/periods/{}/calculate-scores", ctx.base_url, period_id))
+        .bearer_auth(school_admin_token)
+        .send()
+        .await
+        .expect("Failed to calculate scores");
+
+    ctx.client
+        .post(&format!("{}/selection/periods/{}/update-rankings", ctx.base_url, period_id))
+        .bearer_auth(school_admin_token)
+        .send()
+        .await
+        .expect("Failed to update rankings");
+
+    (period_id, registration_numbers)
+}
+
+#[tokio::test]
+async fn test_announcement_run_selection() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+    let school_id = ctx.create_test_school(&super_admin.access_token, "TEST600").await;
+    let school_admin = ctx.create_school_admin(school_id, "admin_announce@test.com").await;
+    let parent = ctx.create_parent(school_id, "parent_announce@test.com").await;
+
+    let (period_id, _) = setup_complete_selection_flow(&ctx, &school_admin.access_token, &parent.access_token, 5).await;
+
+    let response = ctx
+        .client
+        .post(&format!("{}/announcements/periods/{}/run-selection", ctx.base_url, period_id))
+        .bearer_auth(&school_admin.access_token)
+        .send()
+        .await
+        .expect("Failed to run selection");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    let result: serde_json::Value = parse_json(response).await;
+    assert_eq!(result["result"]["total_accepted"].as_i64().unwrap(), 3);
+    assert_eq!(result["result"]["total_rejected"].as_i64().unwrap(), 2);
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_announcement_get_selection_summary() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+    let school_id = ctx.create_test_school(&super_admin.access_token, "TEST601").await;
+    let school_admin = ctx.create_school_admin(school_id, "admin_announce2@test.com").await;
+    let parent = ctx.create_parent(school_id, "parent_announce2@test.com").await;
+
+    let (period_id, _) = setup_complete_selection_flow(&ctx, &school_admin.access_token, &parent.access_token, 4).await;
+
+    // Run selection first
+    ctx.client
+        .post(&format!("{}/announcements/periods/{}/run-selection", ctx.base_url, period_id))
+        .bearer_auth(&school_admin.access_token)
+        .send()
+        .await
+        .expect("Failed to run selection");
+
+    // Get summary
+    let response = ctx
+        .client
+        .get(&format!("{}/announcements/periods/{}/summary", ctx.base_url, period_id))
+        .bearer_auth(&school_admin.access_token)
+        .send()
+        .await
+        .expect("Failed to get summary");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    let summary: serde_json::Value = parse_json(response).await;
+    assert_eq!(summary["total_registrations"].as_i64().unwrap(), 4);
+    assert_eq!(summary["total_accepted"].as_i64().unwrap(), 3);
+    assert_eq!(summary["total_rejected"].as_i64().unwrap(), 1);
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_announcement_announce_results() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+    let school_id = ctx.create_test_school(&super_admin.access_token, "TEST602").await;
+    let school_admin = ctx.create_school_admin(school_id, "admin_announce3@test.com").await;
+    let parent = ctx.create_parent(school_id, "parent_announce3@test.com").await;
+
+    let (period_id, _) = setup_complete_selection_flow(&ctx, &school_admin.access_token, &parent.access_token, 4).await;
+
+    // Run selection first
+    ctx.client
+        .post(&format!("{}/announcements/periods/{}/run-selection", ctx.base_url, period_id))
+        .bearer_auth(&school_admin.access_token)
+        .send()
+        .await
+        .expect("Failed to run selection");
+
+    // Announce results
+    let response = ctx
+        .client
+        .post(&format!("{}/announcements/periods/{}/announce", ctx.base_url, period_id))
+        .bearer_auth(&school_admin.access_token)
+        .send()
+        .await
+        .expect("Failed to announce results");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    let result: serde_json::Value = parse_json(response).await;
+    assert_eq!(result["result"]["total_notified"].as_i64().unwrap(), 4);
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_announcement_check_result_public() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+    let school_id = ctx.create_test_school(&super_admin.access_token, "TEST603").await;
+    let school_admin = ctx.create_school_admin(school_id, "admin_announce4@test.com").await;
+    let parent = ctx.create_parent(school_id, "parent_announce4@test.com").await;
+
+    let (period_id, registration_numbers) = setup_complete_selection_flow(&ctx, &school_admin.access_token, &parent.access_token, 2).await;
+
+    // Run selection and announce
+    ctx.client
+        .post(&format!("{}/announcements/periods/{}/run-selection", ctx.base_url, period_id))
+        .bearer_auth(&school_admin.access_token)
+        .send()
+        .await
+        .expect("Failed to run selection");
+
+    ctx.client
+        .post(&format!("{}/announcements/periods/{}/announce", ctx.base_url, period_id))
+        .bearer_auth(&school_admin.access_token)
+        .send()
+        .await
+        .expect("Failed to announce results");
+
+    // Check result without authentication (public endpoint)
+    let response = ctx
+        .client
+        .get(&format!(
+            "{}/announcements/check-result?registration_number={}&student_nisn=2000000000",
+            ctx.base_url, registration_numbers[0]
+        ))
+        .send()
+        .await
+        .expect("Failed to check result");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    let result: serde_json::Value = parse_json(response).await;
+    assert!(result["registration_number"].as_str().is_some());
+    assert!(result["selection_status"].as_str().is_some());
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_announcement_check_result_invalid_nisn() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+    let school_id = ctx.create_test_school(&super_admin.access_token, "TEST604").await;
+    let school_admin = ctx.create_school_admin(school_id, "admin_announce5@test.com").await;
+    let parent = ctx.create_parent(school_id, "parent_announce5@test.com").await;
+
+    let (_, registration_numbers) = setup_complete_selection_flow(&ctx, &school_admin.access_token, &parent.access_token, 1).await;
+
+    // Check with invalid NISN length
+    let response = ctx
+        .client
+        .get(&format!(
+            "{}/announcements/check-result?registration_number={}&student_nisn=123",
+            ctx.base_url, registration_numbers[0]
+        ))
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    ctx.cleanup_test_data().await;
+}
+
+#[tokio::test]
+async fn test_announcement_check_result_not_found() {
+    let ctx = TestContext::new().await;
+
+    let response = ctx
+        .client
+        .get(&format!(
+            "{}/announcements/check-result?registration_number=INVALID123&student_nisn=9999999999",
+            ctx.base_url
+        ))
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn test_announcement_parent_cannot_run_selection() {
+    let ctx = TestContext::new().await;
+    ctx.cleanup_test_data().await;
+
+    let super_admin = ctx.create_super_admin().await;
+    let school_id = ctx.create_test_school(&super_admin.access_token, "TEST605").await;
+    let school_admin = ctx.create_school_admin(school_id, "admin_announce6@test.com").await;
+    let parent = ctx.create_parent(school_id, "parent_announce6@test.com").await;
+
+    let (period_id, _) = setup_complete_selection_flow(&ctx, &school_admin.access_token, &parent.access_token, 2).await;
+
+    // Parent tries to run selection
+    let response = ctx
+        .client
+        .post(&format!("{}/announcements/periods/{}/run-selection", ctx.base_url, period_id))
+        .bearer_auth(&parent.access_token)
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+
+    ctx.cleanup_test_data().await;
+}

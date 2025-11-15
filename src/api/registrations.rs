@@ -1,13 +1,13 @@
 use axum::{
-    extract::{Path, Query, Request, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     middleware,
-    routing::{delete, get, post, put},
-    Json, Router,
+    routing::{delete, get, post},
+    Extension, Json, Router,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use validator::Validate;
+use utoipa::ToSchema;
 
 use crate::api::middleware::auth::{auth_middleware, AuthUser};
 use crate::models::registration::{Document, Registration};
@@ -27,88 +27,198 @@ pub fn routes(state: AppState) -> Router<AppState> {
         .route_layer(middleware::from_fn_with_state(state.clone(), auth_middleware))
 }
 
-#[derive(Debug, Deserialize, Validate)]
-struct CreateRegistrationRequest {
+/// Request untuk membuat pendaftaran baru
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CreateRegistrationRequest {
+    /// ID periode PPDB
+    #[schema(example = 1)]
     period_id: i32,
+    
+    /// ID jalur pendaftaran
+    #[schema(example = 1)]
     path_id: i32,
     
-    #[validate(length(equal = 10))]
+    /// NISN siswa
+    #[schema(example = "0012345678")]
     student_nisn: String,
     
-    #[validate(length(min = 3))]
+    /// Nama lengkap siswa
+    #[schema(example = "Ahmad Fauzi")]
     student_name: String,
     
-    #[validate(custom = "validate_gender")]
+    /// Jenis kelamin (L/P)
+    #[schema(example = "L")]
     student_gender: String,
     
+    /// Tempat lahir siswa
+    #[schema(example = "Jakarta")]
     student_birth_place: String,
+    
+    /// Tanggal lahir siswa
+    #[schema(value_type = String, example = "2010-01-15T00:00:00Z")]
     student_birth_date: DateTime<Utc>,
+    
+    /// Agama siswa
+    #[schema(example = "Islam")]
     student_religion: String,
+    
+    /// Alamat lengkap siswa
+    #[schema(example = "Jl. Merdeka No. 123, Jakarta")]
     student_address: String,
+    
+    /// Nomor telepon siswa (opsional)
+    #[schema(example = "081234567890")]
     student_phone: Option<String>,
+    
+    /// Email siswa (opsional)
+    #[schema(example = "ahmad@example.com")]
     student_email: Option<String>,
     
-    #[validate(length(min = 3))]
+    /// Nama orang tua/wali
+    #[schema(example = "Budi Santoso")]
     parent_name: String,
     
-    #[validate(length(equal = 16))]
+    /// NIK orang tua/wali
+    #[schema(example = "3201234567890123")]
     parent_nik: String,
     
+    /// Nomor telepon orang tua/wali
+    #[schema(example = "081234567890")]
     parent_phone: String,
+    
+    /// Pekerjaan orang tua/wali (opsional)
+    #[schema(example = "Pegawai Swasta")]
     parent_occupation: Option<String>,
+    
+    /// Penghasilan orang tua/wali (opsional)
+    #[schema(example = "5000000")]
     parent_income: Option<String>,
     
+    /// Nama sekolah asal (opsional)
+    #[schema(example = "SD Negeri 1 Jakarta")]
     previous_school_name: Option<String>,
+    
+    /// NPSN sekolah asal (opsional)
+    #[schema(example = "12345678")]
     previous_school_npsn: Option<String>,
+    
+    /// Alamat sekolah asal (opsional)
+    #[schema(example = "Jl. Pendidikan No. 1, Jakarta")]
     previous_school_address: Option<String>,
     
+    /// Data khusus jalur pendaftaran (JSON)
+    #[schema(value_type = Object)]
     path_data: serde_json::Value,
 }
 
-fn validate_gender(gender: &str) -> Result<(), validator::ValidationError> {
-    match gender.to_uppercase().as_str() {
-        "L" | "P" | "LAKI-LAKI" | "PEREMPUAN" => Ok(()),
-        _ => Err(validator::ValidationError::new("invalid_gender")),
-    }
-}
-
-#[derive(Debug, Deserialize, Validate)]
-struct UpdateRegistrationRequest {
+/// Request untuk update pendaftaran
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateRegistrationRequest {
+    /// Nama lengkap siswa (opsional)
+    #[schema(example = "Ahmad Fauzi")]
     student_name: Option<String>,
+    
+    /// Jenis kelamin (opsional)
+    #[schema(example = "L")]
     student_gender: Option<String>,
+    
+    /// Tempat lahir siswa (opsional)
+    #[schema(example = "Jakarta")]
     student_birth_place: Option<String>,
+    
+    /// Tanggal lahir siswa (opsional)
+    #[schema(value_type = Option<String>, example = "2010-01-15T00:00:00Z")]
     student_birth_date: Option<DateTime<Utc>>,
+    
+    /// Agama siswa (opsional)
+    #[schema(example = "Islam")]
     student_religion: Option<String>,
+    
+    /// Alamat lengkap siswa (opsional)
+    #[schema(example = "Jl. Merdeka No. 123, Jakarta")]
     student_address: Option<String>,
+    
+    /// Nomor telepon siswa (opsional)
+    #[schema(example = "081234567890")]
     student_phone: Option<String>,
+    
+    /// Email siswa (opsional)
+    #[schema(example = "ahmad@example.com")]
     student_email: Option<String>,
+    
+    /// Nama orang tua/wali (opsional)
+    #[schema(example = "Budi Santoso")]
     parent_name: Option<String>,
+    
+    /// NIK orang tua/wali (opsional)
+    #[schema(example = "3201234567890123")]
     parent_nik: Option<String>,
+    
+    /// Nomor telepon orang tua/wali (opsional)
+    #[schema(example = "081234567890")]
     parent_phone: Option<String>,
+    
+    /// Pekerjaan orang tua/wali (opsional)
+    #[schema(example = "Pegawai Swasta")]
     parent_occupation: Option<String>,
+    
+    /// Penghasilan orang tua/wali (opsional)
+    #[schema(example = "5000000")]
     parent_income: Option<String>,
+    
+    /// Data khusus jalur pendaftaran (opsional)
+    #[schema(value_type = Option<Object>)]
     path_data: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Deserialize)]
-struct UploadDocumentRequest {
+/// Request untuk upload dokumen
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UploadDocumentRequest {
+    /// Tipe dokumen (akta_lahir/kartu_keluarga/ijazah/dll)
+    #[schema(example = "akta_lahir")]
     document_type: String,
+    
+    /// URL file yang sudah diupload
+    #[schema(example = "https://storage.example.com/documents/akta_123.pdf")]
     file_url: String,
+    
+    /// Nama file
+    #[schema(example = "akta_lahir.pdf")]
     file_name: String,
+    
+    /// Ukuran file dalam bytes
+    #[schema(example = 1024000)]
     file_size: i64,
+    
+    /// MIME type file
+    #[schema(example = "application/pdf")]
     mime_type: String,
 }
 
-#[derive(Debug, Deserialize)]
-struct ListRegistrationsQuery {
+/// Query parameters untuk list pendaftaran
+#[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct ListRegistrationsQuery {
+    /// Nomor halaman
     #[serde(default = "default_page")]
+    #[schema(example = 1)]
     page: i64,
     
+    /// Jumlah item per halaman
     #[serde(default = "default_page_size")]
+    #[schema(example = 10)]
     page_size: i64,
     
+    /// Filter berdasarkan status
+    #[schema(example = "submitted")]
     status: Option<String>,
+    
+    /// Filter berdasarkan ID periode
+    #[schema(example = 1)]
     period_id: Option<i32>,
+    
+    /// Filter berdasarkan ID jalur
+    #[schema(example = 1)]
     path_id: Option<i32>,
 }
 
@@ -120,37 +230,127 @@ fn default_page_size() -> i64 {
     10
 }
 
-#[derive(Debug, Serialize)]
-struct RegistrationResponse {
+/// Response data pendaftaran
+#[derive(Debug, Serialize, ToSchema)]
+pub struct RegistrationResponse {
+    /// ID pendaftaran
+    #[schema(example = 1)]
     id: i32,
+    
+    /// ID sekolah
+    #[schema(example = 1)]
     school_id: i32,
+    
+    /// ID user (orang tua)
+    #[schema(example = 1)]
     user_id: i32,
+    
+    /// ID periode PPDB
+    #[schema(example = 1)]
     period_id: i32,
+    
+    /// ID jalur pendaftaran
+    #[schema(example = 1)]
     path_id: i32,
+    
+    /// Nomor pendaftaran
+    #[schema(example = "PPDB-2024-001")]
     registration_number: Option<String>,
+    
+    /// NISN siswa
+    #[schema(example = "0012345678")]
     student_nisn: String,
+    
+    /// Nama lengkap siswa
+    #[schema(example = "Ahmad Fauzi")]
     student_name: String,
+    
+    /// Jenis kelamin
+    #[schema(example = "L")]
     student_gender: String,
+    
+    /// Tempat lahir
+    #[schema(example = "Jakarta")]
     student_birth_place: String,
+    
+    /// Tanggal lahir
+    #[schema(value_type = String, example = "2010-01-15T00:00:00Z")]
     student_birth_date: DateTime<Utc>,
+    
+    /// Agama
+    #[schema(example = "Islam")]
     student_religion: String,
+    
+    /// Alamat lengkap
+    #[schema(example = "Jl. Merdeka No. 123, Jakarta")]
     student_address: String,
+    
+    /// Nomor telepon siswa
+    #[schema(example = "081234567890")]
     student_phone: Option<String>,
+    
+    /// Email siswa
+    #[schema(example = "ahmad@example.com")]
     student_email: Option<String>,
+    
+    /// Nama orang tua/wali
+    #[schema(example = "Budi Santoso")]
     parent_name: String,
+    
+    /// NIK orang tua/wali
+    #[schema(example = "3201234567890123")]
     parent_nik: String,
+    
+    /// Nomor telepon orang tua/wali
+    #[schema(example = "081234567890")]
     parent_phone: String,
+    
+    /// Pekerjaan orang tua/wali
+    #[schema(example = "Pegawai Swasta")]
     parent_occupation: Option<String>,
+    
+    /// Penghasilan orang tua/wali
+    #[schema(example = "5000000")]
     parent_income: Option<String>,
+    
+    /// Nama sekolah asal
+    #[schema(example = "SD Negeri 1 Jakarta")]
     previous_school_name: Option<String>,
+    
+    /// NPSN sekolah asal
+    #[schema(example = "12345678")]
     previous_school_npsn: Option<String>,
+    
+    /// Alamat sekolah asal
+    #[schema(example = "Jl. Pendidikan No. 1, Jakarta")]
     previous_school_address: Option<String>,
+    
+    /// Data khusus jalur pendaftaran
+    #[schema(value_type = Object)]
     path_data: serde_json::Value,
+    
+    /// Skor seleksi
+    #[schema(example = 85.5)]
     selection_score: Option<f64>,
+    
+    /// Peringkat
+    #[schema(example = 10)]
     ranking: Option<i32>,
+    
+    /// Status pendaftaran
+    #[schema(example = "submitted")]
     status: String,
+    
+    /// Alasan penolakan (jika ditolak)
+    #[schema(example = "Dokumen tidak lengkap")]
     rejection_reason: Option<String>,
+    
+    /// Waktu pembuatan
+    #[schema(value_type = String, example = "2024-01-01T00:00:00Z")]
     created_at: DateTime<Utc>,
+    
+    /// Waktu update terakhir
+    #[schema(value_type = String, example = "2024-01-01T00:00:00Z")]
     updated_at: DateTime<Utc>,
 }
 
@@ -191,18 +391,51 @@ impl From<Registration> for RegistrationResponse {
     }
 }
 
-#[derive(Debug, Serialize)]
-struct DocumentResponse {
+/// Response data dokumen
+#[derive(Debug, Serialize, ToSchema)]
+pub struct DocumentResponse {
+    /// ID dokumen
+    #[schema(example = 1)]
     id: i32,
+    
+    /// ID pendaftaran
+    #[schema(example = 1)]
     registration_id: i32,
+    
+    /// Tipe dokumen
+    #[schema(example = "akta_lahir")]
     document_type: String,
+    
+    /// URL file
+    #[schema(example = "https://storage.example.com/documents/akta_123.pdf")]
     file_url: String,
+    
+    /// Nama file
+    #[schema(example = "akta_lahir.pdf")]
     file_name: String,
+    
+    /// Ukuran file dalam bytes
+    #[schema(example = 1024000)]
     file_size: i64,
+    
+    /// MIME type file
+    #[schema(example = "application/pdf")]
     mime_type: String,
+    
+    /// Status verifikasi
+    #[schema(example = "pending")]
     verification_status: String,
+    
+    /// Catatan verifikasi
+    #[schema(example = "Dokumen sudah sesuai")]
     verification_notes: Option<String>,
+    
+    /// Waktu pembuatan
+    #[schema(value_type = String, example = "2024-01-01T00:00:00Z")]
     created_at: DateTime<Utc>,
+    
+    /// Waktu update terakhir
+    #[schema(value_type = String, example = "2024-01-01T00:00:00Z")]
     updated_at: DateTime<Utc>,
 }
 
@@ -224,35 +457,65 @@ impl From<Document> for DocumentResponse {
     }
 }
 
-#[derive(Debug, Serialize)]
-struct ListRegistrationsResponse {
+/// Response list pendaftaran dengan pagination
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ListRegistrationsResponse {
+    /// Daftar pendaftaran
     registrations: Vec<RegistrationResponse>,
+    
+    /// Total data
+    #[schema(example = 50)]
     total: i64,
+    
+    /// Halaman saat ini
+    #[schema(example = 1)]
     page: i64,
+    
+    /// Jumlah item per halaman
+    #[schema(example = 10)]
     page_size: i64,
+    
+    /// Total halaman
+    #[schema(example = 5)]
     total_pages: i64,
 }
 
-#[derive(Debug, Serialize)]
-struct MessageResponse {
+/// Response pesan sukses
+#[derive(Debug, Serialize, ToSchema)]
+pub struct MessageResponse {
+    /// Pesan
+    #[schema(example = "Operation successful")]
     message: String,
 }
 
+/// Membuat pendaftaran baru
+///
+/// Endpoint ini digunakan untuk membuat pendaftaran PPDB baru.
+/// Orang tua dapat mendaftarkan anak mereka ke periode dan jalur yang tersedia.
+#[utoipa::path(
+    post,
+    path = "/api/registrations",
+    tag = "Registrations",
+    request_body = CreateRegistrationRequest,
+    responses(
+        (status = 201, description = "Pendaftaran berhasil dibuat", body = RegistrationResponse),
+        (status = 400, description = "Request tidak valid"),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 404, description = "Periode atau jalur tidak ditemukan")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn create_registration(
     State(state): State<AppState>,
-    req: Request,
+    Extension(auth_user): Extension<AuthUser>,
     Json(payload): Json<CreateRegistrationRequest>,
 ) -> AppResult<(StatusCode, Json<RegistrationResponse>)> {
-    // Validate request
-    payload.validate().map_err(|e| {
-        AppError::Validation(format!("Validation error: {}", e))
-    })?;
-
-    // Get authenticated user
-    let auth_user = req
-        .extensions()
-        .get::<AuthUser>()
-        .ok_or_else(|| AppError::Authentication("Not authenticated".to_string()))?;
+    // Validate gender
+    if !["L", "P", "LAKI-LAKI", "PEREMPUAN"].contains(&payload.student_gender.to_uppercase().as_str()) {
+        return Err(AppError::Validation("Invalid gender".to_string()));
+    }
 
     let school_id = auth_user.school_id.ok_or_else(|| {
         AppError::Authentication("User must be associated with a school".to_string())
@@ -294,16 +557,29 @@ async fn create_registration(
     Ok((StatusCode::CREATED, Json(registration.into())))
 }
 
+/// Mendapatkan daftar pendaftaran
+///
+/// Endpoint ini mengembalikan daftar pendaftaran dengan pagination dan filter.
+/// - Orang tua hanya dapat melihat pendaftaran mereka sendiri
+/// - Admin sekolah dapat melihat semua pendaftaran di sekolahnya
+#[utoipa::path(
+    get,
+    path = "/api/registrations",
+    tag = "Registrations",
+    params(ListRegistrationsQuery),
+    responses(
+        (status = 200, description = "Daftar pendaftaran berhasil diambil", body = ListRegistrationsResponse),
+        (status = 401, description = "Tidak terautentikasi")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn list_registrations(
     State(state): State<AppState>,
-    req: Request,
+    Extension(auth_user): Extension<AuthUser>,
     Query(query): Query<ListRegistrationsQuery>,
 ) -> AppResult<Json<ListRegistrationsResponse>> {
-    // Get authenticated user
-    let auth_user = req
-        .extensions()
-        .get::<AuthUser>()
-        .ok_or_else(|| AppError::Authentication("Not authenticated".to_string()))?;
 
     // Create registration service
     let registration_repo = RegistrationRepository::new(state.db.clone());
@@ -347,16 +623,31 @@ async fn list_registrations(
     }))
 }
 
+/// Mendapatkan detail pendaftaran
+///
+/// Endpoint ini mengembalikan detail pendaftaran berdasarkan ID.
+#[utoipa::path(
+    get,
+    path = "/api/registrations/{id}",
+    tag = "Registrations",
+    params(
+        ("id" = i32, Path, description = "ID pendaftaran")
+    ),
+    responses(
+        (status = 200, description = "Detail pendaftaran berhasil diambil", body = RegistrationResponse),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 403, description = "Tidak memiliki akses"),
+        (status = 404, description = "Pendaftaran tidak ditemukan")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn get_registration(
     State(state): State<AppState>,
-    req: Request,
+    Extension(auth_user): Extension<AuthUser>,
     Path(id): Path<i32>,
 ) -> AppResult<Json<RegistrationResponse>> {
-    // Get authenticated user
-    let auth_user = req
-        .extensions()
-        .get::<AuthUser>()
-        .ok_or_else(|| AppError::Authentication("Not authenticated".to_string()))?;
 
     // Create registration service
     let registration_repo = RegistrationRepository::new(state.db.clone());
@@ -376,22 +667,35 @@ async fn get_registration(
     Ok(Json(registration.into()))
 }
 
+/// Update pendaftaran
+///
+/// Endpoint ini digunakan untuk mengupdate data pendaftaran.
+/// Hanya dapat dilakukan oleh pemilik pendaftaran dan sebelum status submitted.
+#[utoipa::path(
+    put,
+    path = "/api/registrations/{id}",
+    tag = "Registrations",
+    params(
+        ("id" = i32, Path, description = "ID pendaftaran")
+    ),
+    request_body = UpdateRegistrationRequest,
+    responses(
+        (status = 200, description = "Pendaftaran berhasil diupdate", body = RegistrationResponse),
+        (status = 400, description = "Request tidak valid"),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 403, description = "Tidak memiliki akses"),
+        (status = 404, description = "Pendaftaran tidak ditemukan")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn update_registration(
     State(state): State<AppState>,
-    req: Request,
+    Extension(auth_user): Extension<AuthUser>,
     Path(id): Path<i32>,
     Json(payload): Json<UpdateRegistrationRequest>,
 ) -> AppResult<Json<RegistrationResponse>> {
-    // Validate request
-    payload.validate().map_err(|e| {
-        AppError::Validation(format!("Validation error: {}", e))
-    })?;
-
-    // Get authenticated user
-    let auth_user = req
-        .extensions()
-        .get::<AuthUser>()
-        .ok_or_else(|| AppError::Authentication("Not authenticated".to_string()))?;
 
     // Create registration service
     let registration_repo = RegistrationRepository::new(state.db.clone());
@@ -430,16 +734,32 @@ async fn update_registration(
     Ok(Json(updated_registration.into()))
 }
 
+/// Submit pendaftaran
+///
+/// Endpoint ini digunakan untuk submit pendaftaran setelah semua data lengkap.
+/// Setelah disubmit, pendaftaran tidak dapat diubah lagi.
+#[utoipa::path(
+    post,
+    path = "/api/registrations/{id}/submit",
+    tag = "Registrations",
+    params(
+        ("id" = i32, Path, description = "ID pendaftaran")
+    ),
+    responses(
+        (status = 200, description = "Pendaftaran berhasil disubmit", body = RegistrationResponse),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 403, description = "Tidak memiliki akses"),
+        (status = 404, description = "Pendaftaran tidak ditemukan")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn submit_registration(
     State(state): State<AppState>,
-    req: Request,
+    Extension(auth_user): Extension<AuthUser>,
     Path(id): Path<i32>,
 ) -> AppResult<Json<RegistrationResponse>> {
-    // Get authenticated user
-    let auth_user = req
-        .extensions()
-        .get::<AuthUser>()
-        .ok_or_else(|| AppError::Authentication("Not authenticated".to_string()))?;
 
     // Create registration service
     let registration_repo = RegistrationRepository::new(state.db.clone());
@@ -460,6 +780,25 @@ async fn submit_registration(
     Ok(Json(submitted_registration.into()))
 }
 
+/// Mendapatkan daftar dokumen pendaftaran
+///
+/// Endpoint ini mengembalikan daftar dokumen yang sudah diupload untuk pendaftaran.
+#[utoipa::path(
+    get,
+    path = "/api/registrations/{registration_id}/documents",
+    tag = "Registrations",
+    params(
+        ("registration_id" = i32, Path, description = "ID pendaftaran")
+    ),
+    responses(
+        (status = 200, description = "Daftar dokumen berhasil diambil", body = Vec<DocumentResponse>),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 404, description = "Pendaftaran tidak ditemukan")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn list_documents(
     State(state): State<AppState>,
     Path(registration_id): Path<i32>,
@@ -475,6 +814,28 @@ async fn list_documents(
     Ok(Json(documents.into_iter().map(|d| d.into()).collect()))
 }
 
+/// Upload dokumen pendaftaran
+///
+/// Endpoint ini digunakan untuk menambahkan dokumen ke pendaftaran.
+/// File harus sudah diupload ke storage terlebih dahulu, endpoint ini hanya menyimpan metadata.
+#[utoipa::path(
+    post,
+    path = "/api/registrations/{registration_id}/documents",
+    tag = "Registrations",
+    params(
+        ("registration_id" = i32, Path, description = "ID pendaftaran")
+    ),
+    request_body = UploadDocumentRequest,
+    responses(
+        (status = 201, description = "Dokumen berhasil diupload", body = DocumentResponse),
+        (status = 400, description = "Request tidak valid"),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 404, description = "Pendaftaran tidak ditemukan")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn upload_document(
     State(state): State<AppState>,
     Path(registration_id): Path<i32>,
@@ -500,16 +861,32 @@ async fn upload_document(
     Ok((StatusCode::CREATED, Json(document.into())))
 }
 
+/// Hapus dokumen pendaftaran
+///
+/// Endpoint ini digunakan untuk menghapus dokumen dari pendaftaran.
+#[utoipa::path(
+    delete,
+    path = "/api/registrations/{registration_id}/documents/{doc_id}",
+    tag = "Registrations",
+    params(
+        ("registration_id" = i32, Path, description = "ID pendaftaran"),
+        ("doc_id" = i32, Path, description = "ID dokumen")
+    ),
+    responses(
+        (status = 200, description = "Dokumen berhasil dihapus", body = MessageResponse),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 403, description = "Tidak memiliki akses"),
+        (status = 404, description = "Dokumen tidak ditemukan")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn delete_document(
     State(state): State<AppState>,
-    req: Request,
-    Path((registration_id, doc_id)): Path<(i32, i32)>,
+    Extension(auth_user): Extension<AuthUser>,
+    Path((_registration_id, doc_id)): Path<(i32, i32)>,
 ) -> AppResult<Json<MessageResponse>> {
-    // Get authenticated user
-    let auth_user = req
-        .extensions()
-        .get::<AuthUser>()
-        .ok_or_else(|| AppError::Authentication("Not authenticated".to_string()))?;
 
     // Create registration service
     let registration_repo = RegistrationRepository::new(state.db.clone());

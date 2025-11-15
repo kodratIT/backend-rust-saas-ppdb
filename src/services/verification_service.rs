@@ -210,11 +210,26 @@ impl VerificationService {
     }
 }
 
-#[derive(Debug, serde::Serialize)]
+/// Statistik verifikasi
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
 pub struct VerificationStats {
+    /// Total pendaftaran
+    #[schema(example = 150)]
     pub total: i64,
+    
+    /// Total yang sudah disubmit
+    #[schema(example = 120)]
     pub submitted: i64,
+    
+    /// Total yang sudah diverifikasi
+    #[schema(example = 80)]
     pub verified: i64,
+    
+    /// Total yang ditolak
+    #[schema(example = 10)]
     pub rejected: i64,
+    
+    /// Total yang menunggu verifikasi
+    #[schema(example = 30)]
     pub pending: i64,
 }

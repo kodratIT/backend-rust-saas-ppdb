@@ -34,7 +34,14 @@ impl SchoolService {
         // Create school
         let school = self
             .school_repo
-            .create_school(name, npsn, code, address, phone, email, logo_url)
+            .create_school(
+                &name,
+                &npsn,
+                &code,
+                address.as_deref().unwrap_or(""),
+                phone.as_deref(),
+                email.as_deref(),
+            )
             .await?;
 
         Ok(school)
@@ -84,7 +91,13 @@ impl SchoolService {
         // Update school
         let updated_school = self
             .school_repo
-            .update_school(id, name, address, phone, email, logo_url)
+            .update_school(
+                id,
+                name.as_deref(),
+                address.as_deref(),
+                phone.as_deref(),
+                email.as_deref(),
+            )
             .await?;
 
         Ok(updated_school)

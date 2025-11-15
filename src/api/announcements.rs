@@ -1,11 +1,11 @@
 use axum::{
-    extract::{Path, Query, Request, State},
+    extract::{Path, Query, State},
     middleware,
     routing::{get, post},
-    Json, Router,
+    Extension, Json, Router,
 };
 use serde::{Deserialize, Serialize};
-use validator::Validate;
+use utoipa::ToSchema;
 
 use crate::api::middleware::auth::{auth_middleware, AuthUser};
 use crate::api::middleware::rbac::require_school_admin;
@@ -33,37 +33,67 @@ pub fn routes(state: AppState) -> Router<AppState> {
     admin_routes.merge(public_routes)
 }
 
-#[derive(Debug, Deserialize, Validate)]
-struct CheckResultQuery {
-    #[validate(length(min = 1))]
+/// Query untuk cek hasil seleksi
+#[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct CheckResultQuery {
+    /// Nomor pendaftaran
+    #[schema(example = "PPDB-2024-001")]
     registration_number: String,
-
-    #[validate(length(equal = 10))]
+    
+    /// NISN siswa
+    #[schema(example = "0012345678")]
     student_nisn: String,
 }
 
-#[derive(Debug, Serialize)]
-struct RunSelectionResponse {
+/// Response jalankan seleksi
+#[derive(Debug, Serialize, ToSchema)]
+pub struct RunSelectionResponse {
+    /// Pesan hasil
+    #[schema(example = "Selection completed successfully. 100 accepted, 50 rejected")]
     message: String,
+    
+    /// Detail hasil seleksi
     result: SelectionResult,
 }
 
-#[derive(Debug, Serialize)]
-struct AnnounceResultsResponse {
+/// Response pengumuman hasil
+#[derive(Debug, Serialize, ToSchema)]
+pub struct AnnounceResultsResponse {
+    /// Pesan hasil
+    #[schema(example = "Results announced successfully. 150 notifications sent (100 accepted, 50 rejected)")]
     message: String,
+    
+    /// Detail hasil pengumuman
     result: AnnouncementResult,
 }
 
+/// Jalankan proses seleksi
+///
+/// Endpoint ini digunakan untuk menjalankan proses seleksi otomatis berdasarkan ranking dan kuota.
+/// Hanya dapat diakses oleh admin sekolah.
+#[utoipa::path(
+    post,
+    path = "/api/announcements/periods/{period_id}/run-selection",
+    tag = "Selection",
+    params(
+        ("period_id" = i32, Path, description = "ID periode")
+    ),
+    responses(
+        (status = 200, description = "Seleksi berhasil dijalankan", body = RunSelectionResponse),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 403, description = "Tidak memiliki akses"),
+        (status = 404, description = "Periode tidak ditemukan")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn run_selection(
     State(state): State<AppState>,
-    req: Request,
+    Extension(auth_user): Extension<AuthUser>,
     Path(period_id): Path<i32>,
 ) -> AppResult<Json<RunSelectionResponse>> {
-    // Get authenticated user
-    let auth_user = req
-        .extensions()
-        .get::<AuthUser>()
-        .ok_or_else(|| AppError::Authentication("Not authenticated".to_string()))?;
 
     // Create announcement service
     let registration_repo = RegistrationRepository::new(state.db.clone());
@@ -84,16 +114,32 @@ async fn run_selection(
     }))
 }
 
+/// Umumkan hasil seleksi
+///
+/// Endpoint ini digunakan untuk mengumumkan hasil seleksi kepada peserta.
+/// Hanya dapat diakses oleh admin sekolah.
+#[utoipa::path(
+    post,
+    path = "/api/announcements/periods/{period_id}/announce",
+    tag = "Selection",
+    params(
+        ("period_id" = i32, Path, description = "ID periode")
+    ),
+    responses(
+        (status = 200, description = "Hasil berhasil diumumkan", body = AnnounceResultsResponse),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 403, description = "Tidak memiliki akses"),
+        (status = 404, description = "Periode tidak ditemukan")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn announce_results(
     State(state): State<AppState>,
-    req: Request,
+    Extension(auth_user): Extension<AuthUser>,
     Path(period_id): Path<i32>,
 ) -> AppResult<Json<AnnounceResultsResponse>> {
-    // Get authenticated user
-    let auth_user = req
-        .extensions()
-        .get::<AuthUser>()
-        .ok_or_else(|| AppError::Authentication("Not authenticated".to_string()))?;
 
     // Create announcement service
     let registration_repo = RegistrationRepository::new(state.db.clone());
@@ -114,6 +160,26 @@ async fn announce_results(
     }))
 }
 
+/// Mendapatkan ringkasan seleksi
+///
+/// Endpoint ini mengembalikan ringkasan hasil seleksi untuk periode tertentu.
+#[utoipa::path(
+    get,
+    path = "/api/announcements/periods/{period_id}/summary",
+    tag = "Selection",
+    params(
+        ("period_id" = i32, Path, description = "ID periode")
+    ),
+    responses(
+        (status = 200, description = "Ringkasan berhasil diambil", body = SelectionSummary),
+        (status = 401, description = "Tidak terautentikasi"),
+        (status = 403, description = "Tidak memiliki akses"),
+        (status = 404, description = "Periode tidak ditemukan")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 async fn get_selection_summary(
     State(state): State<AppState>,
     Path(period_id): Path<i32>,
@@ -131,14 +197,28 @@ async fn get_selection_summary(
     Ok(Json(summary))
 }
 
+/// Cek hasil seleksi (public)
+///
+/// Endpoint publik untuk mengecek hasil seleksi menggunakan nomor pendaftaran dan NISN.
+#[utoipa::path(
+    get,
+    path = "/api/announcements/check-result",
+    tag = "Selection",
+    params(CheckResultQuery),
+    responses(
+        (status = 200, description = "Hasil berhasil ditemukan", body = ResultCheckResponse),
+        (status = 400, description = "Request tidak valid"),
+        (status = 404, description = "Hasil tidak ditemukan")
+    )
+)]
 async fn check_result(
     State(state): State<AppState>,
     Query(query): Query<CheckResultQuery>,
 ) -> AppResult<Json<ResultCheckResponse>> {
-    // Validate query
-    query.validate().map_err(|e| {
-        AppError::Validation(format!("Validation error: {}", e))
-    })?;
+    // Validate NISN length
+    if query.student_nisn.len() != 10 {
+        return Err(AppError::Validation("NISN must be 10 characters".to_string()));
+    }
 
     // Create announcement service
     let registration_repo = RegistrationRepository::new(state.db.clone());

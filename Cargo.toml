@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 # Web framework
 axum = "0.7"
-tower = "0.4"
+tower = { version = "0.4", features = ["util"] }
 tower-http = { version = "0.5", features = ["cors", "trace", "fs"] }
 
 # Async runtime
@@ -49,5 +49,14 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Redis
 redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }
 
+# API Documentation
+utoipa = { version = "4.2", features = ["axum_extras", "chrono", "uuid"] }
+utoipa-swagger-ui = { version = "6.0", features = ["axum"] }
+utoipa-rapidoc = { version = "3.0", features = ["axum"] }
+utoipa-redoc = { version = "3.0", features = ["axum"] }
+
 [dev-dependencies]
 tokio-test = "0.4"
+reqwest = { version = "0.11", features = ["json"] }
+axum-test = "14"
+once_cell = "1.19"

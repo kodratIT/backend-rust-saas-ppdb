@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
@@ -24,10 +24,10 @@ pub struct User {
     pub email_verified: bool,
     pub email_verification_token: Option<String>,
     pub reset_password_token: Option<String>,
-    pub reset_password_expires: Option<DateTime<Utc>>,
-    pub last_login_at: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub reset_password_expires: Option<NaiveDateTime>,
+    pub last_login_at: Option<NaiveDateTime>,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
 }
 
 impl User {
